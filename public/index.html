@@ -3,113 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> لعبة إنسان حيوان نبات - </title>
+    <title>لعبة إنسان حيوان نبات</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <style>body { background-color: #0f172a; color: #ffffff; font-family: Tahoma, sans-serif; }</style>
+    <style>
+        body { background-color: #0d1b2a; color: #ffffff; font-family: Tahoma, sans-serif; }
+        .pinball-circle { background: radial-gradient(circle, #facc15 0%, #eab308 100%); }
+    </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-2">
 
-    <!-- نافذة الإشعارات عند تحميل اللعبة -->
-    <div id="notificationBanner" class="fixed top-4 bg-amber-500 text-slate-900 font-bold px-6 py-3 rounded-2xl shadow-2xl z-50 transition-all duration-500 flex items-center gap-3">
-        <span>🔔 أهلاً بك! اربح الكاش من تجميع النقاط (كل 100 نقطة = 10 كاش) للتلميحات!</span>
-    </div>
-
-    <!-- 1. شاشة تسجيل الدخول (بريد أو رقم جوال) -->
+    <!-- شاشة تسجيل الدخول -->
     <div id="loginScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
         <h2 class="text-2xl font-bold mb-2 text-amber-400">🌱 إنسان حيوان نبات</h2>
-        <p class="text-xs text-slate-400 mb-4">سجل برقم الجوال أو البريد الإلكتروني للبدء</p>
-        
-        <input type="text" id="identifierInput" placeholder="البريد الإلكتروني أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
+        <p class="text-xs text-slate-400 mb-4">سجل برقم الجوال أو البريد الإلكتروني</p>
+        <input type="text" id="identifierInput" placeholder="البريد أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
         <input type="password" id="passwordInput" placeholder="كلمة المرور" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
-        <input type="text" id="usernameInput" placeholder="اسم المستخدم (اختياري عند التسجيل الجديد)" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-sm">
+        <input type="text" id="usernameInput" placeholder="اسم المستخدم" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-sm">
+        <button onclick="auth()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">دخول / تسجيل 🚀</button>
+    </div>
+
+    <!-- الشاشة الرئيسية المطابقة للصورة المرفقة (Lobby) -->
+    <div id="lobbyScreen" class="hidden bg-[#0d1b2a] border border-slate-800 p-4 rounded-3xl w-full max-w-md shadow-2xl relative flex flex-col items-center">
         
-        <button onclick="authenticateUser()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">دخول / تسجيل 🚀</button>
+        <!-- شريط البيانات العلوي المطابق للصورة -->
+        <div class="w-full flex justify-between items-center bg-slate-900/80 p-2 rounded-2xl mb-6 text-xs border border-slate-700">
+            <div class="flex items-center gap-1 font-bold text-rose-400">🎟️ <span id="ticketsCount">118</span></div>
+            <div class="flex items-center gap-1 font-bold text-amber-400">🪙 <span id="cashCount">15</span></div>
+            <div class="flex items-center gap-1 font-bold text-amber-200">👑 <span id="crownsCount">0</span></div>
+            <div class="flex items-center gap-1 font-bold text-emerald-400">❤️ <span id="livesCount">5/5</span></div>
+        </div>
+
+        <!-- معلومات المركز والترتيب -->
+        <div class="w-full bg-slate-800/80 p-3 rounded-2xl flex justify-between items-center mb-6 border border-slate-700">
+            <span class="text-xs text-slate-300">المركز الأول: <b id="topPlayerName" class="text-amber-400">saeed2222</b></span>
+            <span class="text-xs bg-slate-900 px-2 py-1 rounded text-amber-300 font-mono">2414 نقطة</span>
+        </div>
+
+        <!-- الأزرار الجانبية اليسرى (هدايا، تحديات، أصدقاء) -->
+        <div class="absolute left-4 top-28 flex flex-col gap-3">
+            <button onclick="claimDaily()" class="bg-amber-600 hover:bg-amber-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
+                <span>🎁</span><span class="mt-1 font-bold">هدايا يومية</span>
+            </button>
+            <button onclick="openFriendsModal()" class="bg-sky-600 hover:bg-sky-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
+                <span>👥</span><span class="mt-1 font-bold">الأصدقاء</span>
+            </button>
+        </div>
+
+        <!-- زر "لعب" الدائري الكبير في المنتصف تماماً مثل الصورة -->
+        <div class="my-10 flex flex-col items-center">
+            <button onclick="startMatch()" class="pinball-circle w-40 h-40 rounded-full shadow-2xl flex flex-col items-center justify-center border-4 border-amber-300 transform hover:scale-105 transition">
+                <span class="text-3xl font-extrabold text-slate-900">لعب</span>
+            </button>
+            
+            <!-- زر خاص تحته -->
+            <button onclick="createPrivateRoom()" class="mt-4 bg-rose-600 hover:bg-rose-500 font-bold px-8 py-2.5 rounded-xl shadow-lg text-white border border-rose-500 text-sm">
+                🔒 خاص (حتى 7 لاعبين)
+            </button>
+        </div>
+
+        <div class="text-xs text-slate-400 mt-auto">طور اللعب الجماعي نشط وجاهز 🚀</div>
     </div>
 
-    <!-- 2. شاشة اللوبي الرئيسي (مع عرض الرصيد والكاش) -->
-    <div id="lobbyScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-            <h2 id="welcomeUser" class="text-lg font-bold text-amber-400">أهلاً بك</h2>
-            <div class="text-xs bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700">
-                💰 رصيد الكاش: <span id="userCashDisplay" class="text-emerald-400 font-bold">0</span>
+    <!-- نافذة الأصدقاء والدعوات -->
+    <div id="friendsModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
+            <h3 class="font-bold text-amber-400 mb-3">دعوة الأصدقاء</h3>
+            <p class="text-xs text-slate-400 mb-3">أدخل رقم جوال صديقك لإرسال إشعار فوري له بالدخول:</p>
+            <input type="text" id="friendPhoneInput" placeholder="رقم الجوال..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white text-sm mb-3">
+            <button onclick="sendInvite()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-xl text-white text-sm mb-2">إرسال دعوة وجوال 📲</button>
+            <button onclick="closeFriendsModal()" class="w-full bg-slate-700 text-white py-2 rounded-xl text-sm">إغلاق</button>
+        </div>
+    </div>
+
+    <!-- شاشة البحث السريع (بانتظار 10 ثوانٍ) -->
+    <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
+        <div class="text-4xl mb-3 animate-spin">⏳</div>
+        <h3 class="text-base font-bold text-amber-300 mb-2">جاري البحث عن لاعبين (حد أقصى 5)...</h3>
+        <p class="text-xs text-slate-400 mb-4">إن لم ينضم أحد خلال 10 ثوانٍ، سيدخل معك بوتات ذكية فوراً.</p>
+        <button onclick="location.reload()" class="bg-rose-600 text-white py-2 px-6 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+
+    <!-- شاشة الغرفة الخاصة -->
+    <div id="privateRoomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
+        <h3 class="font-bold text-amber-400 mb-2">🔒 الغرفة الخاصة (حتى 7 لاعبين)</h3>
+        <div class="bg-slate-900 p-3 rounded-xl font-mono text-xl text-emerald-400 font-bold mb-3" id="roomCodeDisplay">-----</div>
+        <ul id="privatePlayersList" class="bg-slate-900 p-3 rounded-xl text-right text-xs space-y-1 mb-4"></ul>
+        <button onclick="location.reload()" class="w-full bg-rose-600 text-white py-2.5 rounded-xl text-sm font-bold">مغادرة الغرفة</button>
+    </div>
+
+    <!-- شاشة اللعب النشطة (مطابقة لتصميم الصورة المرفقة للصق الإجابات وتواجد اللاعبين وشات الغرفة) -->
+    <div id="gameScreen" class="hidden bg-[#0d1b2a] border border-slate-700 p-4 rounded-2xl w-full max-w-4xl shadow-2xl">
+        <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2 text-xs">
+            <span id="roundBadge" class="bg-slate-900 px-3 py-1 rounded-full text-slate-300 font-bold">الجولة 1 / 3</span>
+            <span id="letterBadge" class="text-lg font-extrabold text-amber-400">الحرف: أ</span>
+            <span id="timerBadge" class="text-rose-400 font-bold">⏱️ 60 ثانية</span>
+        </div>
+
+        <!-- قائمة اللاعبين المتواجدين في الغرفة (كما في الصورة المرفقة) -->
+        <div class="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-slate-700" id="gamePlayersBar"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- خانات الإجابة مع علامة صح بالاخضر فوراً -->
+            <div class="md:col-span-2 space-y-2" id="categoriesBox"></div>
+
+            <!-- الشات العام للغرفة -->
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col h-44">
+                <h4 class="text-xs font-bold text-sky-400 mb-1 border-b border-slate-800 pb-1">💬 الشات العام</h4>
+                <div id="chatBox" class="flex-1 overflow-y-auto space-y-1 text-xs mb-2 text-right"></div>
+                <div class="flex gap-1">
+                    <input type="text" id="chatInput" placeholder="اكتب..." class="w-full bg-slate-800 p-1.5 rounded text-xs text-white">
+                    <button onclick="sendChat()" class="bg-sky-600 px-3 py-1 rounded text-xs font-bold">إرسال</button>
+                </div>
             </div>
         </div>
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium mb-1">اختر عدد الجولات:</label>
-            <select id="roundsSelect" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white text-sm">
-                <option value="3">3 جولات</option>
-                <option value="5">5 جولات</option>
-            </select>
-        </div>
-
-        <button onclick="startMatchmaking()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-4 rounded-xl text-white shadow-lg text-lg flex items-center justify-center gap-2">
-            <span>🎮</span><span>لعب (بحث عن لاعبين أو بوتات)</span>
-        </button>
     </div>
 
-    <!-- 3. شاشة البحث بمهلة 10 ثوانٍ -->
-    <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <div class="text-4xl mb-4 animate-spin">⏳</div>
-        <h3 class="text-lg font-bold text-amber-300 mb-2">جاري البحث عن لاعبين...</h3>
-        <p class="text-xs text-slate-400 mb-4">إن لم ينضم أحد خلال 10 ثوانٍ، سيتم إدخالك مع بوتات ذكية تلقائياً.</p>
-        <button onclick="location.reload()" class="bg-rose-600 hover:bg-rose-500 font-bold py-2 px-6 rounded-xl text-white text-sm">إلغاء</button>
-    </div>
-
-    <!-- 4. شاشة اللعب النشطة (مع زر التحقق الفوري، شات عام، ولوحة النقاط) -->
-    <div id="gameScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-4xl shadow-2xl">
-        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-            <span id="roundCounterBadge" class="text-xs bg-slate-900 px-3 py-1.5 rounded-full text-slate-300 font-bold">الجولة 1 / 3</span>
-            <div class="text-xl font-extrabold bg-amber-500/20 text-amber-400 px-4 py-1 rounded-xl border border-amber-500/30" id="targetLetterDisplay">الحرف: أ</div>
-            <span id="gameTimer" class="text-sm font-bold text-rose-400">⏱️ 60 ثانية</span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- خانات الإدخال مع فحص التحقق (صح/خطأ) -->
-            <div class="md:col-span-2 space-y-3" id="categoriesInputsContainer"></div>
-
-            <!-- لوحة النقاط والشات الجماعي -->
-            <div class="space-y-4">
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                    <h4 class="text-xs font-bold text-amber-400 mb-2 border-b border-slate-800 pb-1">📊 لوحة النقاط الحية</h4>
-                    <ul id="liveScoreboardList" class="space-y-1.5 text-xs"></ul>
-                </div>
-
-                <!-- شات الغرفة العام -->
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col h-40">
-                    <h4 class="text-xs font-bold text-sky-400 mb-1 border-b border-slate-800 pb-1">💬 الشات العام للغرفة</h4>
-                    <div id="chatMessages" class="flex-1 overflow-y-auto space-y-1 text-xs mb-2 text-right"></div>
-                    <div class="flex gap-1">
-                        <input type="text" id="chatInput" placeholder="اكتب رسالة..." class="w-full bg-slate-800 p-1.5 rounded text-xs text-white">
-                        <button onclick="sendChatMessage()" class="bg-sky-600 px-3 py-1 rounded text-xs font-bold">إرسال</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <button onclick="submitFinalAnswers()" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg text-base">تسجيل واعتمد الإجابات 🚀</button>
-    </div>
-
-    <!-- 5. شاشة النتائج النهائية وترتيب الفائزين -->
-    <div id="finalResultsScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
-        <h2 class="text-2xl font-bold mb-2 text-amber-400">🏆 تتويج الأبطال والنتائج النهائية</h2>
-        <ol id="finalPodiumList" class="space-y-2 mb-6 text-right bg-slate-900 p-4 rounded-xl text-sm"></ol>
-        <button onclick="location.reload()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">العودة للوبي الرئيسي 🏠</button>
+    <!-- شاشة النتائج النهائية -->
+    <div id="finalScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
+        <h2 class="text-xl font-bold text-amber-400 mb-3">🏆 لوحة الفائزين النهائية</h2>
+        <ol id="podiumList" class="space-y-2 text-right bg-slate-900 p-4 rounded-xl text-xs mb-4"></ol>
+        <button onclick="location.reload()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm">العودة للرئيسية 🏠</button>
     </div>
 
     <script>
         const socket = io();
-        let targetCurrentLetter = '';
-        let verifiedAnswersState = {};
+        let currentTargetLetter = '';
 
-        // إخفاء إشعار التحميل بعد 5 ثوانٍ
-        setTimeout(() => {
-            document.getElementById('notificationBanner').style.opacity = '0';
-            setTimeout(() => document.getElementById('notificationBanner').remove(), 500);
-        }, 5000);
-
-        function authenticateUser() {
+        function auth() {
             const identifier = document.getElementById('identifierInput').value;
             const password = document.getElementById('passwordInput').value;
             const username = document.getElementById('usernameInput').value;
@@ -120,145 +141,123 @@
         socket.on('auth_success', (data) => {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('lobbyScreen').classList.remove('hidden');
-            document.getElementById('welcomeUser').innerText = `أهلاً بك، ${data.username}`;
-            document.getElementById('userCashDisplay').innerText = data.cash;
+            document.getElementById('cashCount').innerText = data.cash;
         });
-
         socket.on('auth_error', (msg) => alert(msg));
-        socket.on('update_wallet', (data) => {
-            document.getElementById('userCashDisplay').innerText = data.cash;
+
+        function claimDaily() { socket.emit('claim_daily'); }
+        socket.on('daily_result', (data) => {
+            alert(data.msg);
+            if(data.success) document.getElementById('cashCount').innerText = data.cash;
         });
 
-        function startMatchmaking() {
-            const rounds = document.getElementById('roundsSelect').value;
+        function openFriendsModal() { document.getElementById('friendsModal').classList.remove('hidden'); }
+        function closeFriendsModal() { document.getElementById('friendsModal').classList.add('hidden'); }
+        function sendInvite() {
+            const phone = document.getElementById('friendPhoneInput').value;
+            if(!phone) return alert('أدخل رقم الجوال');
+            socket.emit('invite_friend', { friendPhone: phone });
+        }
+        socket.on('invite_sent', (msg) => { alert(msg); closeFriendsModal(); });
+
+        function startMatch() {
             document.getElementById('lobbyScreen').classList.add('hidden');
             document.getElementById('searchingScreen').classList.remove('hidden');
-            socket.emit('start_matchmaking', rounds);
+            socket.emit('start_matchmaking');
         }
 
-        socket.on('match_found', (data) => {
-            document.getElementById('searchingScreen').classList.add('hidden');
+        function createPrivateRoom() {
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            socket.emit('create_private_room');
+        }
+
+        socket.on('private_room_created', (code) => {
+            document.getElementById('privateRoomScreen').classList.remove('hidden');
+            document.getElementById('roomCodeDisplay').innerText = code;
         });
 
-        let roundTimerInterval;
-        socket.on('start_round', (data) => {
+        socket.on('update_room_players', (players) => {
+            const list = document.getElementById('privatePlayersList');
+            list.innerHTML = '';
+            players.forEach(p => list.innerHTML += `<li>👤 ${p.username}</li>`);
+        });
+
+        socket.on('match_started', (players) => {
             document.getElementById('searchingScreen').classList.add('hidden');
-            document.getElementById('finalResultsScreen').classList.add('hidden');
+            document.getElementById('privateRoomScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
+        });
 
-            document.getElementById('roundCounterBadge').innerText = `الجولة ${data.roundNum} من ${data.totalRounds}`;
-            document.getElementById('targetLetterDisplay').innerText = `الحرف: ${data.letter}`;
-            targetCurrentLetter = data.letter;
-            verifiedAnswersState = {};
+        socket.on('start_round_data', (data) => {
+            document.getElementById('roundBadge').innerText = `الجولة ${data.round} من ${data.total}`;
+            document.getElementById('letterBadge').innerText = `الحرف: ${data.letter}`;
+            currentTargetLetter = data.letter;
 
-            const container = document.getElementById('categoriesInputsContainer');
-            container.innerHTML = '';
+            const box = document.getElementById('categoriesBox');
+            box.innerHTML = '';
             data.categories.forEach(cat => {
-                container.innerHTML += `
-                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700">
-                        <label class="block text-xs font-bold text-amber-300 mb-1">${cat} (بحرف ${data.letter})</label>
-                        <div class="flex gap-2 items-center">
-                            <input type="text" id="cat_${cat}" oninput="verifyInputWord('${cat}', this.value)" placeholder="اكتب ${cat}..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-white text-sm focus:outline-none focus:border-amber-400">
-                            <span id="status_${cat}" class="text-xl"></span>
-                        </div>
+                box.innerHTML += `
+                    <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700 flex items-center gap-2">
+                        <span class="text-xs font-bold text-amber-300 w-16">${cat}</span>
+                        <input type="text" id="inp_${cat}" oninput="verifyBox('${cat}', this.value)" placeholder="بحرف ${data.letter}..." class="w-full bg-slate-900 border border-slate-700 p-2 rounded text-white text-xs">
+                        <span id="chk_${cat}" class="text-lg"></span>
                     </div>
                 `;
             });
-
-            updateScoreboard(data.players);
-
-            // عداد الجولة دقيقة واحدة (60 ثانية)
-            let timeLeft = 60;
-            const timerEl = document.getElementById('gameTimer');
-            clearInterval(roundTimerInterval);
-            roundTimerInterval = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = `⏱️ ${timeLeft} ثانية`;
-                if(timeLeft <= 0) {
-                    clearInterval(roundTimerInterval);
-                    submitFinalAnswers();
-                }
-            }, 1000);
+            renderGamePlayers(data.players);
         });
 
-        // فحص ذكي فوري لكل خانة
-        function verifyInputWord(category, word) {
-            const statusSpan = document.getElementById(`status_${category}`);
-            if(!word.trim()) {
-                statusSpan.innerText = '';
-                verifiedAnswersState[category] = false;
-                return;
-            }
-            socket.emit('verify_answer', { category, word, letter: targetCurrentLetter });
+        function verifyBox(cat, val) {
+            const chkSpan = document.getElementById(`chk_${cat}`);
+            if(!val.trim()) { chkSpan.innerText = ''; return; }
+            socket.emit('verify_answer_box', { category: cat, word: val, letter: currentTargetLetter });
         }
 
-        socket.on('answer_verification_result', (res) => {
-            const statusSpan = document.getElementById(`status_${res.category}`);
+        socket.on('answer_box_result', (res) => {
+            const chkSpan = document.getElementById(`chk_${res.category}`);
+            const inputField = document.getElementById(`inp_${res.category}`);
             if(res.isValid) {
-                statusSpan.innerText = '✅';
-                verifiedAnswersState[res.category] = true;
+                chkSpan.innerText = '✅';
             } else {
-                statusSpan.innerText = '❌';
-                verifiedAnswersState[res.category] = false;
+                chkSpan.innerText = '❌';
+                setTimeout(() => { inputField.value = ''; chkSpan.innerText = ''; }, 800); // تُمحى الخانة تلقائياً ليحاول مجدداً
             }
         });
 
-        function submitFinalAnswers() {
-            let correctCount = 0;
-            Object.keys(verifiedAnswersState).forEach(cat => {
-                if(verifiedAnswersState[cat] === true) correctCount++;
-            });
-            socket.emit('submit_round_answers', { correctAnswersCount: correctCount });
-            // تعطيل الحقول مؤقتاً بعد الاعتماد
-            const inputs = document.querySelectorAll('#categoriesInputsContainer input');
-            inputs.forEach(i => i.disabled = true);
-        }
-
-        socket.on('live_score_update', (players) => {
-            updateScoreboard(players);
-        });
-
-        function updateScoreboard(players) {
-            const list = document.getElementById('liveScoreboardList');
-            list.innerHTML = '';
+        function renderGamePlayers(players) {
+            const bar = document.getElementById('gamePlayersBar');
+            bar.innerHTML = '';
             players.forEach(p => {
-                list.innerHTML += `<li class="flex justify-between items-center text-slate-200 border-b border-slate-800 pb-1">
-                    <span>👤 ${p.username}</span>
-                    <span class="font-bold text-amber-400">${p.score} ن</span>
-                </li>`;
+                bar.innerHTML += `
+                    <div class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-center min-w-[80px]">
+                        <div class="text-xs font-bold text-amber-300">${p.username}</div>
+                        <div class="text-[10px] text-emerald-400">${p.score} نقطة</div>
+                    </div>
+                `;
             });
         }
 
-        // شات الغرفة
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            if(!input.value.trim()) return;
-            socket.emit('send_room_chat', input.value);
-            input.value = '';
+        function sendChat() {
+            const inp = document.getElementById('chatInput');
+            if(!inp.value.trim()) return;
+            socket.emit('send_chat', inp.value);
+            inp.value = '';
         }
 
-        socket.on('new_room_chat', (data) => {
-            const chatBox = document.getElementById('chatMessages');
-            chatBox.innerHTML += `<div><span class="text-amber-400 font-bold">${data.username}:</span> ${data.message}</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
+        socket.on('new_chat', (data) => {
+            const box = document.getElementById('chatBox');
+            box.innerHTML += `<div><span class="text-amber-400 font-bold">${data.username}:</span> ${data.msg}</div>`;
+            box.scrollTop = box.scrollHeight;
         });
 
-        socket.on('round_ended', () => {
-            clearInterval(roundTimerInterval);
-        });
-
-        socket.on('game_final_results', (players) => {
-            clearInterval(roundTimerInterval);
+        socket.on('game_over', (players) => {
             document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('finalResultsScreen').classList.remove('hidden');
-            const podium = document.getElementById('finalPodiumList');
-            podium.innerHTML = '';
-            players.forEach((p, index) => {
-                let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
-                podium.innerHTML += `<li class="flex justify-between items-center font-bold border-b border-slate-800 py-2">
-                    <span>${medal} المركز ${index + 1}: ${p.username}</span>
-                    <span class="text-amber-400">${p.score} نقطة</span>
-                </li>`;
+            document.getElementById('finalScreen').classList.remove('hidden');
+            const list = document.getElementById('podiumList');
+            list.innerHTML = '';
+            players.forEach((p, i) => {
+                let m = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+                list.innerHTML += `<li class="flex justify-between py-1 border-b border-slate-800"><span>${m} ${p.username}</span><span class="text-amber-400">${p.score} نقطة</span></li>`;
             });
         });
     </script>

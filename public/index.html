@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة التحدي الجماعي (Human-Animal-Plant)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      body.theme-dark { --bg-main: #0f172a; --card-bg: #1e293b; --card-border: #334155; --text-primary: #ffffff; }
+      body.theme-classic { --bg-main: #2d1b0e; --card-bg: #422817; --card-border: #78350f; --text-primary: #fef3c7; }
+      body.theme-neon { --bg-main: #09090b; --card-bg: #18181b; --card-border: #a855f7; --text-primary: #38bdf8; }
+
+      body { background-color: var(--bg-main); color: var(--text-primary); transition: background 0.4s; }
+      .theme-card { background-color: var(--card-bg); border-color: var(--card-border); }
+
+      @keyframes shake {
+        0% { transform: translate(1px, 1px); }
+        20% { transform: translate(-3px, 0px); }
+        40% { transform: translate(3px, 2px); }
+        60% { transform: translate(-3px, 1px); }
+        80% { transform: translate(1px, -1px); }
+        100% { transform: translate(0, 0); }
+      }
+      .shake-effect { animation: shake 0.5s; }
+
+      @keyframes floatUp {
+        0% { opacity: 1; transform: translateY(0) scale(0.8); }
+        100% { opacity: 0; transform: translateY(-80px) scale(1.2); }
+      }
+      .floating-emoji { animation: floatUp 1.5s ease-out forwards; }
+    </style>
+</head>
+<body class="theme-dark min-h-screen flex items-center justify-center p-4">
+
+    <!-- شاشة تسجيل الدخول المحدثة -->
+    <div id="loginScreen" class="theme-card border p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+        <h2 class="text-2xl font-bold mb-4 text-center">🎮 تسجيل الدخول للعبة</h2>
+        
+        <input type="text" id="usernameInput" placeholder="اسم المستخدم" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white focus:outline-none focus:border-emerald-500">
+        <input type="password" id="passwordInput" placeholder="كلمة المرور" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white focus:outline-none focus:border-emerald-500">
+        
+        <button onclick="login()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl transition shadow-lg text-white mb-3">
+            دخول / تسجيل جديد
+        </button>
+
+        <!-- زر اللعب كضيف السريع -->
+        <button onclick="playAsGuest()" class="w-full bg-slate-700 hover:bg-slate-600 font-bold py-3 rounded-xl transition shadow-lg text-amber-400 border border-slate-600 flex items-center justify-center gap-2">
+            <span>👤</span>
+            <span>اللعب كضيف (دخول سريع)</span>
+        </button>
+    </div>
+
+    <!-- شاشة اللوبي الرئيسي -->
+    <div id="lobbyScreen" class="hidden theme-card border p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
+        <h2 id="welcomeUser" class="text-xl font-bold mb-2">أهلاً بك</h2>
+        <p id="playerRankDisplay" class="text-amber-400 font-bold mb-4">الرتبة: جاري التحميل...</p>
+        
+        <button onclick="claimDailyReward()" class="w-full bg-amber-600 hover:bg-amber-500 font-bold py-2.5 rounded-xl transition shadow-lg mb-3 text-sm text-white">
+            🎁 استلم مكافأة الدخول اليومي (+50 نقطة)
+        </button>
+
+        <div class="mb-3 text-right">
+            <label class="block text-sm font-medium mb-1">اختر نمط اللعب:</label>
+            <select id="gameModeSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+                <option value="classic">🛡️ النمط الكلاسيكي (60 ثانية)</option>
+                <option value="blitz">⚡ النمط السريع Blitz (15 ثانية)</option>
+                <option value="survival">⏳ نمط البقاء Survival (استبعاد المتأخرين)</option>
+            </select>
+        </div>
+
+        <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl transition shadow-lg text-white mb-2">إنشاء غرفة جديدة 🏠</button>
+        <button onclick="startSoloPractice()" class="w-full bg-purple-600 hover:bg-purple-500 font-bold py-3 rounded-xl transition shadow-lg text-white">🤖 تحدي البوت الذكي (تدريب فردي)</button>
+        
+        <div class="mt-4 text-right">
+            <label class="block text-sm font-medium mb-1">مظهر وثيم اللعبة:</label>
+            <select id="themeSelect" onchange="changeGameTheme(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white">
+                <option value="theme-dark">🌙 الثيم الليلي</option>
+                <option value="theme-classic">🪵 الثيم الخشبي الكلاسيكي</option>
+                <option value="theme-neon">⚡ ثيم النيون المضيء</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- شاشة اللعب التفاعلية -->
+    <div id="gameScreen" class="hidden theme-card border p-6 rounded-2xl w-full max-w-lg shadow-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <span id="targetLetter" class="text-3xl font-extrabold text-amber-400">حرف: أ</span>
+            <span id="timerDisplay" class="text-xl font-bold bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">⏱️ 60ث</span>
+        </div>
+
+        <div id="questionsContainer" class="space-y-3 mb-4"></div>
+
+        <div class="flex justify-center gap-2 my-3 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-700">
+            <button onclick="usePowerup('freeze')" class="bg-blue-600 hover:bg-blue-500 text-xs font-bold px-3 py-2 rounded-xl text-white">⏳ تجميد (+10ث)</button>
+            <button onclick="usePowerup('hint')" class="bg-purple-600 hover:bg-purple-500 text-xs font-bold px-3 py-2 rounded-xl text-white">💡 تلميح ذكي</button>
+            <button onclick="usePowerup('double')" class="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-3 py-2 rounded-xl text-white">⭐ مضاعفة (2x)</button>
+        </div>
+        <div id="aiHintBox" class="hidden bg-purple-900/40 border border-purple-500/50 text-purple-200 text-sm p-3 rounded-xl mb-3 text-center"></div>
+
+        <div class="flex justify-center gap-3 mb-4 border-t border-slate-700 pt-3">
+            <button onclick="sendEmoji('😂')" class="text-xl">😂</button>
+            <button onclick="sendEmoji('👏')" class="text-xl">👏</button>
+            <button onclick="sendEmoji('🔥')" class="text-xl">🔥</button>
+            <button onclick="sendEmoji('🚀')" class="text-xl">🚀</button>
+        </div>
+
+        <button onclick="submitAnswers()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">إرسال الإجابات 🚀</button>
+    </div>
+
+    <div id="reactionsContainer" class="fixed bottom-10 right-10 pointer-events-none z-50 flex flex-col gap-2 items-end"></div>
+
+    <div id="mockAdModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center shadow-2xl">
+            <span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block">إعلان بيني تجريبي (AdMob) 📺</span>
+            <h3 class="text-white font-bold text-lg mb-2">مساحة إعلانية</h3>
+            <p class="text-slate-400 text-sm mb-6">سيظهر هنا إعلان حقيقي عند نشر التطبيق على متجر Google Play.</p>
+            <button onclick="closeMockAd()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white">إغلاق الإعلان (×)</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let roundsCounter = 0;
+
+        function login() {
+            const username = document.getElementById('usernameInput').value.trim();
+            const password = document.getElementById('passwordInput').value.trim();
+            if (!username || !password) return alert('الرجاء إدخال اسم المستخدم وكلمة المرور');
+            socket.emit('login', { username, password });
+        }
+
+        function playAsGuest() {
+            socket.emit('guest_login');
+        }
+
+        socket.on('auth_success', (data) => {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.remove('hidden');
+            document.getElementById('welcomeUser').innerText = `أهلاً بك، ${data.username}`;
+            document.getElementById('playerRankDisplay').innerText = `الرتبة: ${data.rank} (${data.score} نقطة)`;
+        });
+
+        socket.on('auth_error', (msg) => alert(msg));
+
+        function claimDailyReward() { socket.emit('claim_daily_reward'); }
+        socket.on('daily_reward_result', (data) => {
+            alert(data.message);
+            if(data.success) document.getElementById('playerRankDisplay').innerText = `الرتبة: ${data.rank} (${data.newScore} نقطة)`;
+        });
+
+        function createRoom() {
+            const mode = document.getElementById('gameModeSelect').value;
+            socket.emit('create_room', mode);
+        }
+
+        socket.on('room_created', (data) => {
+            alert(`🏠 تم إنشاء الغرفة بنجاح! كود الغرفة: ${data.roomCode}`);
+        });
+
+        function startSoloPractice() { socket.emit('start_solo_practice'); }
+
+        let countdownInterval = null;
+        socket.on('game_started', (data) => {
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('targetLetter').innerText = `حرف: ${data.letter}`;
+
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+            data.group.questions.forEach((q, idx) => {
+                container.innerHTML += `<div><label class="block text-sm mb-1">${q}</label><input type="text" data-index="${idx}" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-white"></div>`;
+            });
+
+            let timeLeft = data.time;
+            const timerDisplay = document.getElementById('timerDisplay');
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    triggerScreenShake();
+                    handleRoundFinished();
+                } else {
+                    timerDisplay.innerText = `⏱️ ${timeLeft}ث`;
+                    timeLeft--;
+                }
+            }, 1000);
+        });
+
+        function triggerScreenShake() {
+            const screen = document.getElementById('gameScreen');
+            screen.classList.add('shake-effect');
+            setTimeout(() => screen.classList.remove('shake-effect'), 500);
+        }
+
+        function handleRoundFinished() {
+            roundsCounter++;
+            if (roundsCounter % 3 === 0) {
+                document.getElementById('mockAdModal').classList.remove('hidden');
+            } else {
+                alert('انتهت الجولة! جاري احتساب النقاط...');
+            }
+        }
+
+        function closeMockAd() {
+            document.getElementById('mockAdModal').classList.add('hidden');
+            alert('انتقلنا لصفحة النتائج بعد الإعلان!');
+        }
+
+        function sendEmoji(emoji) { socket.emit('send_reaction', emoji); }
+        socket.on('player_reaction', (data) => {
+            const container = document.getElementById('reactionsContainer');
+            const div = document.createElement('div');
+            div.className = 'bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 floating-emoji text-sm text-white';
+            div.innerHTML = `<span class="text-amber-400 font-bold">${data.username}:</span> <span class="text-xl">${data.emoji}</span>`;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 1500);
+        });
+
+        function usePowerup(type) { socket.emit('use_powerup', type); }
+        socket.on('time_extended', (data) => alert(`⏳ قام اللاعب [${data.username}] بتجميد الوقت وإضافة 10 ثوانٍ!`));
+        socket.on('ai_hint_received', (data) => {
+            const box = document.getElementById('aiHintBox');
+            box.innerText = data.message;
+            box.classList.remove('hidden');
+        });
+        socket.on('powerup_activated', (data) => alert(data.message));
+
+        function changeGameTheme(theme) {
+            document.body.className = `${theme} min-h-screen flex items-center justify-center p-4`;
+            localStorage.setItem('gameTheme', theme);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('gameTheme') || 'theme-dark';
+            document.body.className = `${saved} min-h-screen flex items-center justify-center p-4`;
+            document.getElementById('themeSelect').value = saved;
+        });
+
+        function submitAnswers() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            alert('تم إرسال إجاباتك بنجاح للسيرفر!');
+        }
+    </script>
+</body>
+</html>

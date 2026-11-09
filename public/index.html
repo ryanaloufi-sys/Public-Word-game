@@ -3,66 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة جوابك جوابهم</title>
+    <title> لعبة إنسان حيوان </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>body { background-color: #0f172a; color: #ffffff; font-family: Tahoma, sans-serif; }</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- شاشة الدخول المباشر (بدون تسجيل تعقيدي) -->
+    <!-- 1. شاشة إدخال الاسم المباشر -->
     <div id="loginScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <h2 class="text-2xl font-bold mb-2 text-amber-400">🔥 جوابك جوابهم</h2>
-        <p class="text-xs text-slate-400 mb-4">اكتب اسمك واهجم مباشرة للعب!</p>
+        <h2 class="text-2xl font-bold mb-2 text-amber-400">🌱 إنسان حيوان نبات</h2>
+        <p class="text-xs text-slate-400 mb-4">اكتب اسمك وادخل للساحة مباشرة!</p>
         <input type="text" id="usernameInput" placeholder="اكتب اسمك هنا..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-center font-bold">
         <button onclick="directJoin()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">دخول للعبة 🚀</button>
     </div>
 
-    <!-- شاشة اللوبي (Lobby) -->
+    <!-- 2. شاشة اللوبي الرئيسية -->
     <div id="lobbyScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
-        <h2 id="welcomeUser" class="text-xl font-bold mb-4 text-amber-400">مرحباً بك</h2>
-        <div class="space-y-3 mb-4">
-            <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">🏠 إنشاء غرفة جديدة (روم)</button>
-            <button onclick="startSoloBot()" class="w-full bg-purple-600 hover:bg-purple-500 font-bold py-3 rounded-xl text-white shadow-lg">🤖 تحدي البوت (لعب فردي)</button>
+        <h2 id="welcomeUser" class="text-xl font-bold mb-4 text-amber-400">أهلاً بك</h2>
+        
+        <div class="mb-4 text-right">
+            <label class="block text-sm font-medium mb-1">اختر عدد الجولات:</label>
+            <select id="roundsSelect" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white">
+                <option value="3">3 جولات</option>
+                <option value="5">5 جولات</option>
+                <option value="7">7 جولات</option>
+            </select>
         </div>
+
+        <div class="space-y-3 mb-4">
+            <!-- زر "لعب" للبحث عن لاعبين -->
+            <button onclick="startQuickMatch()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3.5 rounded-xl text-white shadow-lg text-lg flex items-center justify-center gap-2">
+                <span>🎮</span><span>لعب (بحث سريع عن لاعبين)</span>
+            </button>
+            <button onclick="createPrivateRoom()" class="w-full bg-purple-600 hover:bg-purple-500 font-bold py-3 rounded-xl text-white shadow-lg">🏠 إنشاء غرفة خاصة</button>
+        </div>
+
         <div class="border-t border-slate-700 pt-4 text-right">
-            <label class="block text-sm font-medium mb-1">الانضمام إلى غرفة صديق:</label>
+            <label class="block text-sm font-medium mb-1">الانضمام برمز الغرفة:</label>
             <div class="flex gap-2">
-                <input type="text" id="roomCodeInput" placeholder="كود الغرفة" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white uppercase text-center font-bold tracking-widest">
-                <button onclick="joinRoom()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl font-bold text-white">انضمام</button>
+                <input type="text" id="roomCodeInput" placeholder="رمز الغرفة" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white uppercase text-center font-bold tracking-widest">
+                <button onclick="joinPrivateRoom()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl font-bold text-white">انضمام</button>
             </div>
         </div>
     </div>
 
-    <!-- شاشة الانتظار للروم -->
-    <div id="roomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
-        <h3 class="text-xl font-bold mb-2 text-amber-400">🚪 غرفة الانتظار</h3>
-        <p class="text-sm text-slate-300 mb-2">شارك كود الروم مع أصدقائك:</p>
+    <!-- 3. شاشة البحث عن لاعبين (Waiting for match) -->
+    <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
+        <div class="text-4xl mb-4 animate-spin">⏳</div>
+        <h3 id="searchStatusText" class="text-lg font-bold text-amber-300 mb-4">جاري البحث عن لاعبين...</h3>
+        <button onclick="cancelSearch()" class="bg-rose-600 hover:bg-rose-500 font-bold py-2 px-6 rounded-xl text-white text-sm">إلغاء البحث</button>
+    </div>
+
+    <!-- 4. شاشة الانتظار للغرفة الخاصة -->
+    <div id="privateRoomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
+        <h3 class="text-xl font-bold mb-2 text-amber-400">🚪 غرفة الانتظار الخاصة</h3>
+        <p class="text-sm text-slate-300 mb-2">شارك رمز الغرفة مع أصدقائك:</p>
         <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 font-mono text-2xl font-bold tracking-widest text-emerald-400 mb-4" id="displayRoomCode">-----</div>
-        <ul id="playersList" class="bg-slate-900 p-3 rounded-xl space-y-1 text-sm mb-4 text-right"></ul>
-        <button id="startGameBtn" onclick="startGame()" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg mb-2">بدء التحدي الآن 🚀</button>
+        <ul id="privatePlayersList" class="bg-slate-900 p-3 rounded-xl space-y-1 text-sm mb-4 text-right"></ul>
+        <button id="startPrivateBtn" onclick="startPrivateGame()" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg mb-2">بدء التحدي 🚀</button>
         <button onclick="leaveToLobby()" class="w-full bg-rose-600 hover:bg-rose-500 font-bold py-2 rounded-xl text-white text-sm">خروج للوبي 🚪</button>
     </div>
 
-    <!-- شاشة السؤال واللعب (مع فحص فوري وعلامة صح/خطأ وزر خروج) -->
-    <div id="gameScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl text-center relative">
-        <!-- زر الخروج من القيم -->
+    <!-- 5. شاشة اللعب النشطة (نفس الصفحة: الحرف، الحقول، ولوحة النقاط الحية) -->
+    <div id="gameScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-2xl shadow-2xl relative">
         <button onclick="leaveToLobby()" class="absolute top-4 left-4 bg-rose-600/80 hover:bg-rose-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">خروج 🚪</button>
 
-        <span id="questionCounter" class="text-xs bg-slate-900 px-3 py-1 rounded-full text-slate-400">السؤال 1 / 3</span>
-        <h3 id="questionTitle" class="text-xl font-bold my-4 text-amber-300">جاري تحميل السؤال...</h3>
-        
-        <div class="relative mb-4">
-            <input type="text" id="answerInput" oninput="checkAnswerInstantly(this.value)" placeholder="اكتب إجابتك هنا..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white text-center text-lg focus:outline-none focus:border-amber-400">
-            <!-- أيقونة الصح والخطأ الفورية -->
-            <span id="instantFeedbackIcon" class="absolute left-3 top-3.5 text-xl font-bold"></span>
+        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+            <span id="roundCounterBadge" class="text-xs bg-slate-900 px-3 py-1.5 rounded-full text-slate-300 font-bold">الجولة 1 / 3</span>
+            <div class="text-2xl font-extrabold bg-amber-500/20 text-amber-400 px-4 py-1 rounded-xl border border-amber-500/30" id="targetLetterDisplay">الحرف: أ</div>
         </div>
 
-        <div id="scoreFeedbackBox" class="text-sm font-bold text-emerald-400 min-h-[30px]"></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- خانات الإدخال للأسئلة -->
+            <div class="md:col-span-2 space-y-3" id="categoriesInputsContainer"></div>
+
+            <!-- لوحة النقاط الحية للجميع في نفس الصفحة -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                <h4 class="text-sm font-bold text-amber-400 mb-2 border-b border-slate-800 pb-1">📊 لوحة النقاط الحية</h4>
+                <ul id="liveScoreboardList" class="space-y-2 text-sm"></ul>
+            </div>
+        </div>
+
+        <button onclick="submitAnswers()" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg text-lg">إرسال الإجابات 🚀</button>
+    </div>
+
+    <!-- 6. شاشة النتائج النهائية وترتيب الأوائل بعد انتهاء جميع الجولات -->
+    <div id="finalResultsScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center">
+        <h2 class="text-2xl font-bold mb-2 text-amber-400">🏆 النتائج النهائية للعبة</h2>
+        <p class="text-xs text-slate-400 mb-4">تم إكمال جميع الجولات بنجاح!</p>
+        <ol id="finalPodiumList" class="space-y-2 mb-6 text-right bg-slate-900 p-4 rounded-xl"></ol>
+        <button onclick="leaveToLobby()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">العودة للوبي الرئيسي 🏠</button>
     </div>
 
     <script>
         const socket = io();
+        let currentCategories = [];
 
         function directJoin() {
             const username = document.getElementById('usernameInput').value;
@@ -76,81 +112,137 @@
             document.getElementById('welcomeUser').innerText = `أهلاً بك، ${data.username}`;
         });
 
-        function createRoom() { socket.emit('create_room'); }
-        socket.on('room_created', (roomCode) => {
+        // زر البحث السريع (لعب)
+        function startQuickMatch() {
+            const rounds = document.getElementById('roundsSelect').value;
             document.getElementById('lobbyScreen').classList.add('hidden');
-            document.getElementById('roomScreen').classList.remove('hidden');
-            document.getElementById('displayRoomCode').innerText = roomCode;
-            document.getElementById('startGameBtn').classList.remove('hidden');
+            document.getElementById('searchingScreen').classList.remove('hidden');
+            socket.emit('find_match', rounds);
+        }
+
+        socket.on('waiting_for_players', (msg) => {
+            document.getElementById('searchStatusText').innerText = msg;
         });
 
-        function joinRoom() {
+        function cancelSearch() {
+            socket.emit('cancel_search');
+            document.getElementById('searchingScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.remove('hidden');
+        }
+
+        // الغرف الخاصة
+        function createPrivateRoom() {
+            const rounds = document.getElementById('roundsSelect').value;
+            socket.emit('create_private_room', rounds);
+        }
+
+        socket.on('private_room_created', (roomCode) => {
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('privateRoomScreen').classList.remove('hidden');
+            document.getElementById('displayRoomCode').innerText = roomCode;
+            document.getElementById('startPrivateBtn').classList.remove('hidden');
+        });
+
+        function joinPrivateRoom() {
             const code = document.getElementById('roomCodeInput').value;
-            if(!code) return alert('أدخل كود الغرفة!');
-            socket.emit('join_room', code);
+            if(!code) return alert('أدخل رمز الغرفة!');
+            socket.emit('join_private_room', code);
         }
 
         socket.on('error_message', (msg) => alert(msg));
 
         socket.on('update_room_players', (players) => {
             document.getElementById('lobbyScreen').classList.add('hidden');
-            document.getElementById('roomScreen').classList.remove('hidden');
-            const list = document.getElementById('playersList');
+            document.getElementById('searchingScreen').classList.add('hidden');
+            document.getElementById('privateRoomScreen').classList.remove('hidden');
+            const list = document.getElementById('privatePlayersList');
             list.innerHTML = '';
             players.forEach(p => {
-                list.innerHTML += `<li class="text-slate-200">👤 ${p.username} (${p.score} نقطة)</li>`;
+                list.innerHTML += `<li class="text-slate-200">👤 ${p.username}</li>`;
             });
         });
 
-        function startGame() { socket.emit('start_game'); }
-        function startSoloBot() { socket.emit('start_solo_bot'); }
+        socket.on('match_found', (data) => {
+            document.getElementById('searchingScreen').classList.add('hidden');
+        });
 
+        function startPrivateGame() { socket.emit('start_private_game'); }
         function leaveToLobby() {
-            document.getElementById('roomScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('lobbyScreen').classList.remove('hidden');
+            location.reload(); // إعادة تحميل نظيفة للعودة للوبي
         }
 
-        socket.on('new_question', (data) => {
-            document.getElementById('roomScreen').classList.add('hidden');
+        // بدء جولة جديدة
+        socket.on('start_round', (data) => {
             document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('searchingScreen').classList.add('hidden');
+            document.getElementById('privateRoomScreen').classList.add('hidden');
+            document.getElementById('finalResultsScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
-            document.getElementById('questionCounter').innerText = `السؤال ${data.questionNum} من ${data.total}`;
-            document.getElementById('questionTitle').innerText = data.question;
-            document.getElementById('answerInput').value = '';
-            document.getElementById('instantFeedbackIcon').innerText = '';
-            document.getElementById('scoreFeedbackBox').innerText = '';
+
+            document.getElementById('roundCounterBadge').innerText = `الجولة ${data.roundNum} من ${data.totalRounds}`;
+            document.getElementById('targetLetterDisplay').innerText = `الحرف: ${data.letter}`;
+
+            currentCategories = data.categories;
+            const container = document.getElementById('categoriesInputsContainer');
+            container.innerHTML = '';
+            data.categories.forEach(cat => {
+                container.innerHTML += `
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-1">${cat} (${data.letter}...)</label>
+                        <input type="text" data-category="${cat}" placeholder="اكتب ${cat} يبدأ بحرف ${data.letter}..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                `;
+            });
+
+            updateScoreboard(data.players);
         });
 
-        // فحص الإجابة فورياً أثناء الكتابة (مثل جوابك جوابهم)
-        let typingTimer;
-        function checkAnswerInstantly(val) {
-            clearTimeout(typingTimer);
-            const icon = document.getElementById('instantFeedbackIcon');
-            if(!val.trim()) {
-                icon.innerText = '';
-                return;
-            }
-            typingTimer = setTimeout(() => {
-                socket.emit('check_instant_answer', val);
-            }, 300); // إرسال خفيف أثناء التوقف البسيط عن الكتابة
+        // تحديث لوحة النقاط الفورية حياً
+        socket.on('live_score_update', (players) => {
+            updateScoreboard(players);
+        });
+
+        function updateScoreboard(players) {
+            const list = document.getElementById('liveScoreboardList');
+            list.innerHTML = '';
+            players.forEach(p => {
+                const submittedBadge = p.hasSubmitted ? '✅' : '⏳';
+                list.innerHTML += `<li class="flex justify-between items-center text-slate-200 border-b border-slate-800 pb-1">
+                    <span>${submittedBadge} ${p.username}</span>
+                    <span class="font-bold text-amber-400">${p.score} ن</span>
+                </li>`;
+            });
         }
 
-        socket.on('answer_check_result', (res) => {
-            const icon = document.getElementById('instantFeedbackIcon');
-            const box = document.getElementById('scoreFeedbackBox');
-            if(res.isCorrect) {
-                icon.innerText = '✅';
-                box.innerText = `إجابة صحيحة! (${res.text}) تطابق مع إجابات الجمهور وحصلت على +${res.points} نقطة`;
-            } else {
-                icon.innerText = '❌';
-                box.innerText = 'إجابة غير موجودة ضمن الإجابات الشائعة';
-            }
+        function submitAnswers() {
+            const inputs = document.querySelectorAll('#categoriesInputsContainer input');
+            const answers = {};
+            inputs.forEach(input => {
+                const cat = input.getAttribute('data-category');
+                answers[cat] = input.value;
+            });
+            socket.emit('submit_round_answers', { answers });
+            // تعطيل الحقول بعد الإرسال الجولة الحالية
+            inputs.forEach(i => i.disabled = true);
+        }
+
+        socket.on('round_ended', (data) => {
+            updateScoreboard(data.players);
         });
 
-        socket.on('game_over', (data) => {
-            alert('انتهت التحديات! شكراً لمشاركتك في جوابك جوابهم.');
-            leaveToLobby();
+        // إظهار الترتيب النهائي بعد انتهاء كافة الجولات
+        socket.on('game_final_results', (players) => {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('finalResultsScreen').classList.remove('hidden');
+            const podium = document.getElementById('finalPodiumList');
+            podium.innerHTML = '';
+            players.forEach((p, index) => {
+                let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
+                podium.innerHTML += `<li class="flex justify-between items-center text-lg font-bold border-b border-slate-800 py-2">
+                    <span>${medal} المركز ${index + 1}: ${p.username}</span>
+                    <span class="text-amber-400">${p.score} نقطة</span>
+                </li>`;
+            });
         });
     </script>
 </body>

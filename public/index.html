@@ -26,9 +26,10 @@
         <button onclick="guestLogin()" class="w-full bg-slate-700 hover:bg-slate-600 font-bold py-2.5 rounded-xl text-amber-300 text-sm border border-slate-600">👤 اللعب كضيف (دخول سريع)</button>
     </div>
 
-    <!-- الشاشة الرئيسية (Lobby) -->
+    <!-- الشاشة الرئيسية المطابقة للصور المرفقة (Lobby) -->
     <div id="lobbyScreen" class="hidden bg-[#0d1b2a] border border-slate-800 p-4 rounded-3xl w-full max-w-md shadow-2xl relative flex flex-col items-center">
         
+        <!-- الشريط العلوي للبيانات -->
         <div class="w-full flex justify-between items-center bg-slate-900/80 p-2 rounded-2xl mb-6 text-xs border border-slate-700">
             <div class="flex items-center gap-1 font-bold text-rose-400">🎟️ <span id="ticketsCount">118</span></div>
             <div class="flex items-center gap-1 font-bold text-amber-400">🪙 <span id="cashCount">15</span></div>
@@ -41,12 +42,17 @@
             <span class="text-xs bg-slate-900 px-2 py-1 rounded text-amber-300 font-mono">2414 نقطة</span>
         </div>
 
+        <!-- الأزرار الجانبية اليسرى -->
         <div class="absolute left-4 top-28 flex flex-col gap-3">
             <button onclick="claimDaily()" class="bg-amber-600 hover:bg-amber-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
                 <span>🎁</span><span class="mt-1 font-bold">هدايا يومية</span>
             </button>
+            <button onclick="openFriendsModal()" class="bg-sky-600 hover:bg-sky-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
+                <span>👥</span><span class="mt-1 font-bold">الأصدقاء</span>
+            </button>
         </div>
 
+        <!-- زر "لعب" الدائري الكبير وزر "خاص" تحته -->
         <div class="my-10 flex flex-col items-center">
             <button onclick="startMatch()" class="pinball-circle w-40 h-40 rounded-full shadow-2xl flex flex-col items-center justify-center border-4 border-amber-300 transform hover:scale-105 transition">
                 <span class="text-3xl font-extrabold text-slate-900">لعب</span>
@@ -58,28 +64,40 @@
         </div>
     </div>
 
+    <!-- نافذة الأصدقاء والدعوات -->
+    <div id="friendsModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
+            <h3 class="font-bold text-amber-400 mb-3">دعوة الأصدقاء</h3>
+            <p class="text-xs text-slate-400 mb-3">أدخل رقم جوال صديقك لإرسال إشعار فوري له باللعب معك:</p>
+            <input type="text" id="friendPhoneInput" placeholder="رقم الجوال..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white text-sm mb-3">
+            <button onclick="sendInvite()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-xl text-white text-sm mb-2">إرسال دعوة وجوال 📲</button>
+            <button onclick="closeFriendsModal()" class="w-full bg-slate-700 text-white py-2 rounded-xl text-sm">إغلاق</button>
+        </div>
+    </div>
+
     <!-- شاشة البحث السريع -->
     <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
         <div class="text-4xl mb-3 animate-spin">⏳</div>
         <h3 class="text-base font-bold text-amber-300 mb-2">جاري البحث عن لاعبين (حد أقصى 5)...</h3>
-        <p class="text-xs text-slate-400 mb-4">إن لم ينضم أحد خلال 10 ثوانٍ، سيدخل معك لاعبون آليون بسلاسة.</p>
+        <p class="text-xs text-slate-400 mb-4">إن لم ينضم أحد خلال 10 ثوانٍ، ستبدأ اللعبة تلقائياً بسلاسة.</p>
         <button onclick="location.reload()" class="bg-rose-600 text-white py-2 px-6 rounded-xl text-xs font-bold">إلغاء</button>
     </div>
 
     <!-- شاشة الغرفة الخاصة -->
     <div id="privateRoomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
         <h3 class="font-bold text-amber-400 mb-2">🔒 الغرفة الخاصة (حتى 7 لاعبين)</h3>
+        <p class="text-xs text-slate-300 mb-2">شارك هذا الكود مع أصدقائك لدعوتهم:</p>
         <div class="bg-slate-900 p-3 rounded-xl font-mono text-xl text-emerald-400 font-bold mb-3" id="roomCodeDisplay">-----</div>
         <ul id="privatePlayersList" class="bg-slate-900 p-3 rounded-xl text-right text-xs space-y-1 mb-4"></ul>
         <button onclick="location.reload()" class="w-full bg-rose-600 text-white py-2.5 rounded-xl text-sm font-bold">مغادرة الغرفة</button>
     </div>
 
-    <!-- شاشة اللعب النشطة مع زر الصح بجانب الخانة للفحص الفوري -->
+    <!-- شاشة اللعب النشطة مع زر الصح ✅ والفحص الفوري لكل خانة -->
     <div id="gameScreen" class="hidden bg-[#0d1b2a] border border-slate-700 p-4 rounded-2xl w-full max-w-4xl shadow-2xl">
         <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2 text-xs">
             <span id="roundBadge" class="bg-slate-900 px-3 py-1 rounded-full text-slate-300 font-bold">الجولة 1 / 3</span>
             <span id="letterBadge" class="text-lg font-extrabold text-amber-400">الحرف: أ</span>
-            <span id="timerBadge" class="text-rose-400 font-bold">⏱️ 60 ثانية</span>
+            <span id="timerBadge" class="text-rose-400 font-bold">⏱️ دقيقة واحدة</span>
         </div>
 
         <div class="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-slate-700" id="gamePlayersBar"></div>
@@ -134,6 +152,15 @@
             if(data.success) document.getElementById('cashCount').innerText = data.cash;
         });
 
+        function openFriendsModal() { document.getElementById('friendsModal').classList.remove('hidden'); }
+        function closeFriendsModal() { document.getElementById('friendsModal').classList.add('hidden'); }
+        function sendInvite() {
+            const phone = document.getElementById('friendPhoneInput').value;
+            if(!phone) return alert('أدخل رقم الجوال');
+            socket.emit('invite_friend', { friendPhone: phone });
+        }
+        socket.on('invite_sent', (msg) => { alert(msg); closeFriendsModal(); });
+
         function startMatch() {
             document.getElementById('lobbyScreen').classList.add('hidden');
             document.getElementById('searchingScreen').classList.remove('hidden');
@@ -148,6 +175,12 @@
         socket.on('private_room_created', (code) => {
             document.getElementById('privateRoomScreen').classList.remove('hidden');
             document.getElementById('roomCodeDisplay').innerText = code;
+        });
+
+        socket.on('update_room_players', (players) => {
+            const list = document.getElementById('privatePlayersList');
+            list.innerHTML = '';
+            players.forEach(p => list.innerHTML += `<li>👤 ${p.username}</li>`);
         });
 
         socket.on('match_started', (players) => {
@@ -168,7 +201,7 @@
                     <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700 flex items-center gap-2">
                         <span class="text-xs font-bold text-amber-300 w-16">${cat}</span>
                         <input type="text" id="inp_${cat}" placeholder="بحرف ${data.letter}..." class="w-full bg-slate-900 border border-slate-700 p-2 rounded text-white text-xs">
-                        <button onclick="checkCatBox('${cat}')" class="bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded text-white font-bold text-xs">✓</button>
+                        <button onclick="checkCatBox('${cat}')" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-white font-bold text-sm">✓</button>
                         <span id="chk_${cat}" class="text-lg"></span>
                     </div>
                 `;

@@ -9,147 +9,177 @@ const io = new Server(server);
 app.use(express.static('public'));
 app.use(express.json());
 
-// بنك الأسئلة والمقارنات الشائعة (على طراز جوابك جوابهم)
-const gameQuestionsBank = [
-    {
-        question: "شيء نفعله كل صباح قبل الذهاب للعمل أو المدرسة؟",
-        answers: [
-            { text: "شرب القهوة", points: 40 },
-            { text: "الإفطار", points: 30 },
-            { text: "تفريش الأسنان", points: 20 },
-            { text: "الاستحمام", points: 10 }
-        ]
-    },
-    {
-        question: "فاكهة حمراء اللون ومحبوبة للجميع؟",
-        answers: [
-            { text: "التفاح", points: 45 },
-            { text: "الفراولة", points: 30 },
-            { text: "البطيخ", points: 15 },
-            { text: "الرمان", points: 10 }
-        ]
-    },
-    {
-        question: "مكان يذهب إليه الناس في الإجازة الأسبوعية؟",
-        answers: [
-            { text: "المول", points: 35 },
-            { text: "البحر", points: 30 },
-            { text: "الحديقة", points: 20 },
-            { text: "المطعم", points: 15 }
-        ]
-    }
-];
+const arabicLetters = ['أ', 'ب', 'ت', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ط', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];
+const categories = ['إنسان', 'حيوان', 'نبات', 'جماد', 'بلاد'];
 
+let waitingPlayers = []; // قائمة انتظار البحث عن لاعبين (زر لعب)
 const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log(`🔌 انضم مستخدم جديد: ${socket.id}`);
+    console.log(`🔌 انصل اللاعب: ${socket.id}`);
 
-    // دخول مباشر بالاسم بدون تسجيل تعقيدي
+    // الدخول المباشر بالاسم
     socket.on('direct_join', (username) => {
-        const cleanName = username ? username.trim() : `لاعب_${Math.floor(1000 + Math.random() * 9000)}`;
-        socket.username = cleanName;
-        socket.emit('join_success', { username: cleanName, score: 0 });
+        socket.username = username ? username.trim() : `لاعب_${Math.floor(1000 + Math.random() * 9000)}`;
+        socket.emit('join_success', { username: socket.username });
     });
 
-    // إنشاء غرفة جديدة
-    socket.on('create_room', () => {
+    // 1. زر "لعب": البحث التلقائي عن لاعبين
+    socket.on('find_match', (totalRounds) => {
+        socket.totalRounds = parseInt(totalRounds) || 3;
+        waitingPlayers.push(socket);
+
+        // إذا تجمع لاعبين أو أكثر، نبدأ غرفة جديدة تلقائياً
+        if (waitingPlayers.length >= 2) {
+            const matchPlayers = waitingPlayers.splice(0, 2); // نأخذ لاعبين كمثال للبدء السريع
+            const roomCode = 'ROOM_' + Math.random().toString(36).substring(2, 6).toUpperCase();
+            
+            rooms[roomCode] = {
+                code: roomCode,
+                players: matchPlayers.map(p => ({ socketId: p.id, username: p.username, score: 0, answers: {} })),
+                totalRounds: matchPlayers[0].totalRounds,
+                currentRound: 0,
+                status: 'playing',
+                timer: 60
+            };
+
+            matchPlayers.forEach(p => {
+                p.join(roomCode);
+                p.roomCode = roomCode;
+            });
+
+            io.to(roomCode).emit('match_found', { players: rooms[roomCode].players });
+            startNewRound(roomCode);
+        } else {
+            socket.emit('waiting_for_players', '🔍 جاري البحث عن لاعبين آخرين...');
+        }
+    });
+
+    // إلغاء البحث
+    socket.on('cancel_search', () => {
+        waitingPlayers = waitingPlayers.filter(p => p.id !== socket.id);
+    });
+
+    // إنشاء غرفة خاصة بكود
+    socket.on('create_private_room', (totalRounds) => {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomCode] = {
             code: roomCode,
             host: socket.username,
-            players: [{ username: socket.username, score: 0, socketId: socket.id }],
+            players: [{ socketId: socket.id, username: socket.username, score: 0, answers: {} }],
+            totalRounds: parseInt(totalRounds) || 3,
+            currentRound: 0,
             status: 'waiting',
-            currentQuestionIndex: 0
+            timer: 60
         };
         socket.join(roomCode);
         socket.roomCode = roomCode;
-        socket.emit('room_created', roomCode);
+        socket.emit('private_room_created', roomCode);
     });
 
-    // الانضمام لغرفة صديق
-    socket.on('join_room', (roomCode) => {
+    // الانضمام برمز الغرفة
+    socket.on('join_private_room', (roomCode) => {
         const code = roomCode.trim().toUpperCase();
         const room = rooms[code];
         if (!room) return socket.emit('error_message', '❌ الغرفة غير موجودة!');
         if (room.status !== 'waiting') return socket.emit('error_message', '⚠️ اللعبة بدأت بالفعل!');
 
-        room.players.push({ username: socket.username, score: 0, socketId: socket.id });
+        room.players.push({ socketId: socket.id, username: socket.username, score: 0, answers: {} });
         socket.join(code);
         socket.roomCode = code;
 
         io.to(code).emit('update_room_players', room.players);
     });
 
-    // بدء اللعبة
-    socket.on('start_game', () => {
+    // بدء الغرفة الخاصة من قبل المضيف
+    socket.on('start_private_game', () => {
         const room = rooms[socket.roomCode];
         if (!room) return;
         room.status = 'playing';
-        sendNextQuestion(room);
+        startNewRound(room.code);
     });
 
-    // اللعب الفردي ضد البوت
-    socket.on('start_solo_bot', () => {
-        const roomCode = 'SOLO_' + Math.random().toString(36).substring(2, 6).toUpperCase();
-        rooms[roomCode] = {
-            code: roomCode,
-            isSolo: true,
-            players: [
-                { username: socket.username, score: 0, socketId: socket.id },
-                { username: '🤖 بوت جوابك جوابهم', score: 0, isBot: true }
-            ],
-            status: 'playing',
-            currentQuestionIndex: 0
-        };
-        socket.join(roomCode);
-        socket.roomCode = roomCode;
-        sendNextQuestion(rooms[roomCode]);
-    });
-
-    // فحص الإجابة فورياً وإرسال النتيجة (صح/خطأ) للطراز الفوري
-    socket.on('check_instant_answer', (answerText) => {
+    // استقبال إجابات اللاعبين وفحصها ذكياً
+    socket.on('submit_round_answers', ({ answers }) => {
         const room = rooms[socket.roomCode];
-        if (!room) return;
+        if (!room || room.status !== 'playing') return;
 
-        const currentQ = gameQuestionsBank[room.currentQuestionIndex - 1];
-        if (!currentQ) return;
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (!player) return;
 
-        const matched = currentQ.answers.find(a => a.text.toLowerCase().includes(answerText.toLowerCase().trim()));
+        let roundScore = 0;
+        const targetLetter = room.currentLetter;
 
-        if (matched) {
-            const player = room.players.find(p => p.socketId === socket.id || p.username === socket.username);
-            if (player) player.score += matched.points;
+        categories.forEach(cat => {
+            const word = (answers[cat] || '').trim();
+            // فحص ذكي: هل الكلمة تبدأ بالحرف المطلوب وليست فارغة؟
+            if (word.length > 0 && word.startsWith(targetLetter)) {
+                roundScore += 10; // 10 نقاط لكل إجابة صحيحة تبدأ بالحرف
+            }
+        });
 
-            socket.emit('answer_check_result', { 
-                isCorrect: true, 
-                text: matched.text, 
-                points: matched.points,
-                updatedPlayers: room.players 
-            });
-        } else {
-            socket.emit('answer_check_result', { isCorrect: false });
+        player.score += roundScore;
+        player.hasSubmitted = true;
+
+        // إرسال تحديث النقاط الفوري للجميع في نفس الغرفة
+        io.to(room.code).emit('live_score_update', room.players);
+
+        // إذا أنهى الجميع إجاباتهم، ننتقل للجولة التالية أو ننهي اللعبة
+        if (room.players.every(p => p.hasSubmitted)) {
+            endRound(room.code);
         }
     });
 
     socket.on('disconnect', () => {
+        waitingPlayers = waitingPlayers.filter(p => p.id !== socket.id);
         console.log(`🔌 انقطع الاتصال: ${socket.id}`);
     });
 });
 
-function sendNextQuestion(room) {
-    if (room.currentQuestionIndex >= gameQuestionsBank.length) {
-        io.to(room.code).emit('game_over', { players: room.players });
+function startNewRound(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    if (room.currentRound >= room.totalRounds) {
+        // انتهت جميع الجولات -> إعلان الترتيب النهائي وفوز الأوائل
+        room.players.sort((a, b) => b.score - a.score);
+        io.to(roomCode).emit('game_final_results', room.players);
+        delete rooms[roomCode];
         return;
     }
-    const q = gameQuestionsBank[room.currentQuestionIndex];
-    io.to(room.code).emit('new_question', {
-        question: q.question,
-        questionNum: room.currentQuestionIndex + 1,
-        total: gameQuestionsBank.length
+
+    room.currentRound++;
+    room.currentLetter = arabicLetters[Math.floor(Math.random() * arabicLetters.length)];
+    room.players.forEach(p => p.hasSubmitted = false);
+
+    io.to(roomCode).emit('start_round', {
+        roundNum: room.currentRound,
+        totalRounds: room.totalRounds,
+        letter: room.currentLetter,
+        categories: categories,
+        players: room.players
     });
-    room.currentQuestionIndex++;
+
+    // مؤقت الجولة (60 ثانية)
+    room.timerInterval = setTimeout(() => {
+        endRound(roomCode);
+    }, 60000);
+}
+
+function endRound(roomCode) {
+    const room = rooms[roomCode];
+    if (!room || room.status !== 'playing') return;
+    clearTimeout(room.timerInterval);
+
+    room.status = 'round_ended';
+    io.to(roomCode).emit('round_ended', { players: room.players });
+
+    // انتظار 4 ثوانٍ ثم بدء الجولة التالية
+    setTimeout(() => {
+        room.status = 'playing';
+        startNewRound(roomCode);
+    }, 4000);
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 السيرفر يعمل على البورت: ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 السيرفر يعمل بانتظام على البورت: ${PORT}`));

@@ -1,8 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,23 +9,7 @@ const io = new Server(server);
 app.use(express.static('public'));
 app.use(express.json());
 
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/word_game_db';
-mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح'))
-  .catch(err => console.error('❌ خطأ في الاتصال بقاعدة البيانات:', err));
-
-const userSchema = new mongoose.Schema({
-    identifier: { type: String, unique: true, required: true },
-    password: { type: String, required: true },
-    username: { type: String, required: true },
-    score: { type: Number, default: 2414 },
-    cash: { type: Number, default: 15 },
-    lastDailyClaim: { type: String, default: '' }
-});
-const User = mongoose.model('User', userSchema);
-
+const usersMemoryDB = [];
 const arabicLetters = ['أ', 'ب', 'ت', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ط', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];
 const categories = ['إنسان', 'حيوان', 'نبات', 'جماد', 'بلاد'];
 
@@ -37,42 +19,31 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log(`🔌 انضم مستخدم: ${socket.id}`);
 
-    // تسجيل الدخول أو إنشاء حساب
-    socket.on('auth_user', async ({ identifier, password, username }) => {
-        try {
-            if (!identifier || !password) return socket.emit('auth_error', 'أدخل البريد/الجوال وكلمة المرور');
-            let user = await User.findOne({ identifier });
-            if (!user) {
-                const hashedPassword = await bcrypt.hash(password, 10);
-                user = new User({ identifier, password: hashedPassword, username: username || 'لاعب جديد' });
-                await user.save();
-            } else {
-                const isMatch = await bcrypt.compare(password, user.password);
-                if (!isMatch) return socket.emit('auth_error', 'كلمة المرور غير صحيحة!');
-            }
-            socket.userId = user._id;
-            socket.username = user.username;
-            socket.emit('auth_success', { username: user.username, score: user.score, cash: user.cash });
-        } catch (e) {
-            socket.emit('auth_error', 'خطأ في الخادم');
+    socket.on('auth_user', ({ identifier, password, username }) => {
+        if (!identifier || !password) {
+            return socket.emit('auth_error', 'يرجى إدخال البريد أو الجوال وكلمة المرور');
         }
+        let user = usersMemoryDB.find(u => u.identifier === identifier);
+        if (!user) {
+            user = { identifier, password, username: username || 'لاعب جديد', cash: 15, score: 2414 };
+            usersMemoryDB.push(user);
+        } else if (user.password !== password) {
+            return socket.emit('auth_error', 'كلمة المرور غير صحيحة!');
+        }
+        socket.username = user.username;
+        socket.emit('auth_success', user);
     });
 
-    // مطالبة المكافأة اليومية
-    socket.on('claim_daily', async () => {
-        if (!socket.userId) return;
-        const user = await User.findById(socket.userId);
-        const today = new Date().toDateString();
-        if (user.lastDailyClaim === today) {
-            return socket.emit('daily_result', { success: false, msg: 'لقد استلمت مكافأتك اليومية مسبقاً!' });
-        }
-        user.cash += 10;
-        user.lastDailyClaim = today;
-        await user.save();
-        socket.emit('daily_result', { success: true, cash: user.cash, msg: '🎉 حصلت على 10 كاش مكافأة يومية!' });
+    socket.on('guest_login', () => {
+        socket.username = `ضيف_${Math.floor(1000 + Math.random() * 9000)}`;
+        socket.emit('auth_success', { username: socket.username, cash: 15, score: 100 });
     });
 
-    // زر "لعب": البحث السريع بحد أقصى 5 مستخدمين أو الدخول مع بوتات بعد 10 ثوانٍ
+    socket.on('claim_daily', () => {
+        socket.emit('daily_result', { success: true, cash: 25, msg: '🎉 حصلت على 10 كاش مكافأة يومية!' });
+    });
+
+    // زر "لعب": البحث بحد أقصى 5 لاعبين أو الدخول مع بوتات بعد 10 ثوانٍ
     socket.on('start_matchmaking', () => {
         matchmakingQueue.push(socket);
 
@@ -82,7 +53,7 @@ io.on('connection', (socket) => {
                 matchmakingQueue.splice(index, 1);
                 createRoomWithBots(socket);
             }
-        }, 10000); // 10 ثواني مهلة
+        }, 10000);
 
         if (matchmakingQueue.length >= 5) {
             const group = matchmakingQueue.splice(0, 5);
@@ -127,7 +98,7 @@ io.on('connection', (socket) => {
         startRoundTimer(roomCode);
     }
 
-    // زر "خاص": إنشاء غرفة خاصة كحد أقصى 7 لاعبين
+    // زر "خاص": إنشاء غرفة خاصة حتى 7 لاعبين
     socket.on('create_private_room', () => {
         const roomCode = 'PRIV_' + Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomCode] = {
@@ -153,28 +124,21 @@ io.on('connection', (socket) => {
         io.to(room.code).emit('update_room_players', room.players);
     });
 
-    // دعوة صديق (إرسال إشعار خارجي محاكى)
-    socket.on('invite_friend', ({ friendPhone }) => {
-        socket.emit('invite_sent', `📤 تم إرسال إشعار ورسالة نصية إلى ${friendPhone} بنجاح للدخول معك في الغرفة!`);
-    });
-
-    // الشات العام داخل الغرفة
-    socket.on('send_chat', (msg) => {
-        if (!socket.roomCode || !rooms[socket.roomCode]) return;
-        io.to(socket.roomCode).emit('new_chat', { username: socket.username, msg });
-    });
-
-    // التحقق الفوري من الإجابة (صح / خطأ بجانب الخانة)
+    // الفحص الفوري للإجابة بزر الصح بجانب الخانة
     socket.on('verify_answer_box', ({ category, word, letter }) => {
         const clean = (word || '').trim();
         const isValid = clean.length >= 2 && clean.startsWith(letter);
         socket.emit('answer_box_result', { category, isValid });
     });
 
+    socket.on('send_chat', (msg) => {
+        if (!socket.roomCode || !rooms[socket.roomCode]) return;
+        io.to(socket.roomCode).emit('new_chat', { username: socket.username, msg });
+    });
+
     socket.on('disconnect', () => {
         if (socket.matchTimer) clearTimeout(socket.matchTimer);
         matchmakingQueue = matchmakingQueue.filter(p => p.id !== socket.id);
-        console.log(`🔌 انقطع الاتصال: ${socket.id}`);
     });
 });
 

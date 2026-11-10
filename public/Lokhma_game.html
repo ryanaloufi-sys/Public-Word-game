@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة لخْمَة - التحدي السريع</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #ffffff; font-family: Tahoma, sans-serif; }
+        .card-box { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4">
+
+    <!-- شاشة البداية وقوانين اللعبة -->
+    <div id="startScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl text-center my-auto">
+        <h1 class="text-4xl font-extrabold text-amber-400 mb-2">🧠 لعبة لخمّة</h1>
+        <p class="text-xs text-slate-300 mb-4">ارتباك، اضطراب، ضحك، متعة تركيز وسرعة!</p>
+        
+        <div class="bg-slate-900 p-4 rounded-xl text-right text-xs text-slate-300 space-y-2 mb-6 border border-slate-700">
+            <div class="font-bold text-amber-400 mb-1">📜 قوانين اللعبة باختصار:</div>
+            <div>• <b>أسماء الألوان:</b> يجب الإجابة بلون النص، وإن كان النص أسود يُجاب بلون الخلفية.</div>
+            <div>• <b>الأشكال / النجوم:</b> الإجابة باسم الشكل بغض النظر عن لونه (شمس، قمر، نجمة، لخمّة).</div>
+            <div>• <b>اليد:</b> أسرع لاعب يضع يديه على البطاقات يربح، وأبطأ لاعب يأخذ الكروت المرمية!</div>
+        </div>
+
+        <input type="text" id="playerName" placeholder="اكتب اسمك للبدء..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-center font-bold">
+        <button onclick="startGame()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold py-3.5 rounded-xl shadow-lg text-lg">بدء التحدي 🃏</button>
+    </div>
+
+    <!-- شاشة اللعب النشطة -->
+    <div id="gameScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl text-center my-auto relative">
+        <div class="flex justify-between items-center mb-4 text-xs">
+            <span class="bg-slate-900 px-3 py-1 rounded-full text-amber-300 font-bold" id="currentRole">اللاعب: ضيف</span>
+            <span class="text-rose-400 font-bold" id="scoreDisplay">النقاط: 0</span>
+        </div>
+
+        <!-- كارت اللعب المركزي -->
+        <div id="cardContainer" class="card-box w-64 h-80 mx-auto bg-slate-900 border-4 border-amber-400 rounded-3xl flex flex-col items-center justify-center shadow-2xl mb-6 relative">
+            <div id="cardShape" class="text-6xl mb-4">⭐</div>
+            <div id="cardText" class="text-3xl font-extrabold" style="color: #ef4444;">أحمر</div>
+            <div id="cardRuleHint" class="absolute bottom-3 text-[10px] text-slate-400">قاعدة الكارت: لون النص</div>
+        </div>
+
+        <!-- أزرار التفاعل والإجابة السريعة (تحدي 3 ثوانٍ) -->
+        <p class="text-xs text-amber-300 mb-2 font-bold animate-pulse" id="timerHint">⏱️ لديك 3 ثوانٍ للإجابة!</p>
+        
+        <div class="grid grid-cols-2 gap-2 mb-4">
+            <button onclick="playerAction('correct')" class="bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg">صحيح / ضغط يد ✋</button>
+            <button onclick="playerAction('wrong')" class="bg-rose-600 hover:bg-rose-500 font-bold py-3 rounded-xl text-white shadow-lg">خطأ / تأخير ❌</button>
+        </div>
+
+        <div id="feedbackMsg" class="text-xs font-bold min-h-[25px]"></div>
+    </div>
+
+    <!-- شاشة انتهاء الجولة -->
+    <div id="gameOverScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center my-auto">
+        <h2 class="text-2xl font-bold text-amber-400 mb-3">🏆 انتهت اللعبة!</h2>
+        <p class="text-sm text-slate-300 mb-4" id="finalScoreText">نقاطك النهائية: 0</p>
+        <button onclick="location.reload()" class="w-full bg-amber-500 text-slate-900 font-bold py-3 rounded-xl">العب مرة أخرى 🔄</button>
+    </div>
+
+    <script>
+        let score = 0;
+        let gameActive = false;
+        let currentCard = {};
+        let turnTimer;
+
+        const shapes = ['☀️', '🌙', '⭐', '🧠'];
+        const colors = [
+            { name: 'أحمر', code: '#ef4444' },
+            { name: 'أخضر', code: '#22c55e' },
+            { name: 'أزرق', code: '#3b82f6' },
+            { name: 'أصفر', code: '#eab308' },
+            { name: 'أسود', code: '#000000' }
+        ];
+
+        function startGame() {
+            const name = document.getElementById('playerName').value.trim();
+            if(!name) return alert('أدخل اسمك أولاً!');
+            document.getElementById('currentRole').innerText = `اللاعب: ${name}`;
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            gameActive = true;
+            nextCard();
+        }
+
+        function nextCard() {
+            if (!gameActive) return;
+
+            // توليد بطاقة عشوائية مطابقة للعبة لخمّة
+            const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+            const textColor = colors[Math.floor(Math.random() * colors.length)];
+            const bgColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            // اختيار قاعدة عشوائية من قوانين لخمّة
+            const rules = ['color_rule', 'shape_rule', 'hand_rule'];
+            const activeRule = rules[Math.floor(Math.random() * rules.length)];
+
+            currentCard = { shape: randomShape, text: textColor.name, textColor: textColor.code, rule: activeRule };
+
+            document.getElementById('cardShape').innerText = randomShape;
+            const textEl = document.getElementById('cardText');
+            textEl.innerText = textColor.name;
+            textEl.style.color = textColor.code;
+
+            let hint = '';
+            if(activeRule === 'color_rule') hint = 'قاعدة: اقرأ لون النص';
+            else if(activeRule === 'shape_rule') hint = 'قاعدة: طابق الشكل (شمس/قمر/نجمة/لخمة)';
+            else hint = 'قاعدة اليد: أسرع ضغط يد!';
+            
+            document.getElementById('cardRuleHint').innerText = hint;
+            document.getElementById('feedbackMsg').innerText = '';
+
+            // عداد 3 ثوانٍ للمهلة (كما في قوانين اللعبة: اللاعب الذي يتأخر 3 ثوانٍ يخسر)
+            let timeLeft = 3;
+            document.getElementById('timerHint').innerText = `⏱️ الوقت باقي: ${timeLeft} ثوانٍ`;
+            
+            clearInterval(turnTimer);
+            turnTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timerHint').innerText = `⏱️ الوقت باقي: ${timeLeft} ثوانٍ`;
+                if(timeLeft <= 0) {
+                    clearInterval(turnTimer);
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        function playerAction(action) {
+            if(!gameActive) return;
+            clearInterval(turnTimer);
+
+            const msg = document.getElementById('feedbackMsg');
+            if(action === 'correct') {
+                score += 10;
+                msg.className = 'text-xs font-bold text-emerald-400';
+                msg.innerText = '✅ بطل! سرعة بديهة ممتازة (+10 نقاط)';
+            } else {
+                score = Math.max(0, score - 5);
+                msg.className = 'text-xs font-bold text-rose-400';
+                msg.innerText = '❌ تأخرت أو أخطأت! (-5 نقاط)';
+            }
+
+            document.getElementById('scoreDisplay').innerText = `النقاط: ${score}`;
+            
+            if(score >= 100) {
+                endGame();
+            } else {
+                setTimeout(nextCard, 1200);
+            }
+        }
+
+        function handleTimeout() {
+            score = Math.max(0, score - 5);
+            document.getElementById('scoreDisplay').innerText = `النقاط: ${score}`;
+            const msg = document.getElementById('feedbackMsg');
+            msg.className = 'text-xs font-bold text-rose-400';
+            msg.innerText = '⌛ انتهت الـ 3 ثوانٍ! أخذت البطاقات المرمية.';
+            setTimeout(nextCard, 1500);
+        }
+
+    </script>
+</body>
+</html>

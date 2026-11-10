@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة لخمَة - التحدي السريع</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0d1b2a; color: #ffffff; font-family: Tahoma, sans-serif; }
+        .card-box { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-3">
+
+    <!-- شاشة إدخال الاسم وقوانين لخمّة -->
+    <div id="lokhmaStartScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-md shadow-2xl text-center">
+        <h1 class="text-3xl font-extrabold text-amber-400 mb-2">🧠 لعبة لخمَة</h1>
+        <p class="text-xs text-slate-300 mb-4">ارتباك، اضطراب، ضحك وسرعة بديهة!</p>
+        
+        <div class="bg-slate-900 p-3 rounded-2xl text-right text-xs text-slate-300 space-y-1.5 mb-5 border border-slate-700">
+            <div class="font-bold text-amber-400 mb-1">📜 قوانين اللعب الأصلية:</div>
+            <div>• <b>أسماء الألوان:</b> الإجابة بلون النص، وإن كان النص أسود يُجاب بلون الخلفية.</div>
+            <div>• <b>الأشكال (شمس - قمر - نجمة - لخمّة):</b> يُجاب باسم الشكل بغض النظر عن لونه.</div>
+            <div>• <b>التحدي:</b> أسرع لاعب يجيب خلال 3 ثوانٍ يربح النقطة!</div>
+        </div>
+
+        <input type="text" id="lokhmaPlayerName" placeholder="اكتب اسمك للبدء..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-center text-sm font-bold">
+        <button onclick="startLokhmaGame()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold py-3.5 rounded-xl shadow-lg text-base">بدء تحدي لخمّة 🃏</button>
+        <a href="index.html" class="block mt-4 text-xs text-slate-400 underline">← العودة للرئيسية (إنسان حيوان نبات)</a>
+    </div>
+
+    <!-- شاشة اللعب النشطة -->
+    <div id="lokhmaGameScreen" class="hidden bg-slate-800 border border-slate-700 p-5 rounded-3xl w-full max-w-md shadow-2xl text-center relative">
+        <button onclick="location.reload()" class="absolute top-4 left-4 bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-1 rounded-lg font-bold">خروج 🚪</button>
+
+        <div class="flex justify-between items-center mb-4 text-xs pt-2">
+            <span class="bg-slate-900 px-3 py-1 rounded-full text-amber-300 font-bold" id="lokhmaPlayerBadge">اللاعب: ضيف</span>
+            <span class="text-rose-400 font-bold text-sm" id="lokhmaScore">النقاط: 0</span>
+        </div>
+
+        <!-- كارت البطاقة المركزي -->
+        <div class="w-64 h-80 mx-auto bg-slate-900 border-4 border-amber-400 rounded-3xl flex flex-col items-center justify-center shadow-2xl mb-5 relative">
+            <div id="lokhmaCardShape" class="text-6xl mb-4">☀️</div>
+            <div id="lokhmaCardText" class="text-3xl font-extrabold">أحمر</div>
+            <div id="lokhmaRuleHint" class="absolute bottom-3 text-[10px] text-slate-400">قاعدة البطاقة: طابق اللون</div>
+        </div>
+
+        <p class="text-xs text-amber-300 mb-3 font-bold animate-pulse" id="lokhmaTimer">⏱️ لديك 3 ثوانٍ للإجابة!</p>
+        
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="lokhmaAction(true)" class="bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white text-sm shadow-lg">صحيح ✋</button>
+            <button onclick="lokhmaAction(false)" class="bg-rose-600 hover:bg-rose-500 font-bold py-3 rounded-xl text-white text-sm shadow-lg">خطأ / تأخير ❌</button>
+        </div>
+        <div id="lokhmaFeedback" class="text-xs font-bold min-h-[25px] mt-2"></div>
+    </div>
+
+    <!-- شاشة نهاية اللعبة -->
+    <div id="lokhmaEndScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-sm shadow-2xl text-center">
+        <h2 class="text-2xl font-bold text-amber-400 mb-3">🏆 انتهت الجولة!</h2>
+        <p class="text-sm text-slate-300 mb-4" id="lokhmaFinalScore">نقاطك النهائية: 0</p>
+        <button onclick="location.reload()" class="w-full bg-amber-500 text-slate-900 font-bold py-3 rounded-xl mb-2">العب مرة أخرى 🔄</button>
+        <a href="index.html" class="text-xs text-slate-400 underline">العودة للرئيسية</a>
+    </div>
+
+    <script>
+        let lScore = 0;
+        let lActive = false;
+        let turnInterval;
+
+        const shapesList = ['☀️', '🌙', '⭐', '🧠'];
+        const colorsList = [
+            { name: 'أحمر', code: '#ef4444' },
+            { name: 'أخضر', code: '#22c55e' },
+            { name: 'أزرق', code: '#3b82f6' },
+            { name: 'أصفر', code: '#eab308' },
+            { name: 'أسود', code: '#ffffff' }
+        ];
+
+        function startLokhmaGame() {
+            const name = document.getElementById('lokhmaPlayerName').value.trim();
+            if(!name) return alert('يرجى إدخال اسمك أولاً!');
+            document.getElementById('lokhmaPlayerBadge').innerText = `اللاعب: ${name}`;
+            document.getElementById('lokhmaStartScreen').classList.add('hidden');
+            document.getElementById('lokhmaGameScreen').classList.remove('hidden');
+            lActive = true;
+            generateLokhmaCard();
+        }
+
+        function generateLokhmaCard() {
+            if (!lActive) return;
+
+            const shape = shapesList[Math.floor(Math.random() * shapesList.length)];
+            const color = colorsList[Math.floor(Math.random() * colorsList.length)];
+
+            document.getElementById('lokhmaCardShape').innerText = shape;
+            const textEl = document.getElementById('lokhmaCardText');
+            textEl.innerText = color.name;
+            textEl.style.color = color.code;
+
+            document.getElementById('lokhmaFeedback').innerText = '';
+
+            // مهلة 3 ثوانٍ لكل كارت
+            let timeLeft = 3;
+            document.getElementById('lokhmaTimer').innerText = `⏱️ متبقي: ${timeLeft} ثوانٍ`;
+
+            clearInterval(turnInterval);
+            turnInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('lokhmaTimer').innerText = `⏱️ متبقي: ${timeLeft} ثوانٍ`;
+                if(timeLeft <= 0) {
+                    clearInterval(turnInterval);
+                    lokhmaAction(false); // خسر الوقت
+                }
+            }, 1000);
+        }
+
+        function lokhmaAction(isCorrect) {
+            if(!lActive) return;
+            clearInterval(turnInterval);
+
+            const msg = document.getElementById('lokhmaFeedback');
+            if(isCorrect) {
+                lScore += 10;
+                msg.className = 'text-xs font-bold text-emerald-400';
+                msg.innerText = '✅ بطل! سرعة بديهة صحيحة (+10 نقاط)';
+            } else {
+                lScore = Math.max(0, lScore - 5);
+                msg.className = 'text-xs font-bold text-rose-400';
+                msg.innerText = '❌ خطأ أو تأخرت في التفاعل! (-5 نقاط)';
+            }
+
+            document.getElementById('lokhmaScore').innerText = `النقاط: ${lScore}`;
+
+            if(lScore >= 100) {
+                lActive = false;
+                document.getElementById('lokhmaGameScreen').classList.add('hidden');
+                document.getElementById('lokhmaEndScreen').classList.remove('hidden');
+                document.getElementById('lokhmaFinalScore').innerText = `مبروك! نقاطك النهائية: ${lScore}`;
+            } else {
+                setTimeout(generateLokhmaCard, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

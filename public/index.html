@@ -3,185 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة إنسان حيوان نبات</title>
+    <title>إنسان حيوان نبات - التصحيح الجماعي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background-color: #0d1b2a; color: #ffffff; font-family: Tahoma, sans-serif; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .pinball-circle { background: radial-gradient(circle, #facc15 0%, #eab308 100%); }
+        body { background-color: #0d1b2a; color: #ffffff; font-family: Tahoma, sans-serif; }
+        .roulette-box { font-size: 3rem; font-weight: bold; color: #facc15; animation: pulse 0.2s infinite; }
     </style>
 </head>
-<body class="w-full h-full p-2">
+<body class="min-h-screen flex items-center justify-center p-3">
 
-    <!-- شاشة الاختيار بين (تسجيل دخول) أو (إنشاء حساب) -->
-    <div id="authChoiceScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <h2 class="text-2xl font-bold mb-3 text-amber-400">🎮 إنسان حيوان نبات</h2>
-        <p class="text-xs text-slate-400 mb-6">اختر طريقة الدخول:</p>
-        <button onclick="showScreen('loginScreen')" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg mb-3">تسجيل الدخول 🔑</button>
-        <button onclick="showScreen('registerScreen')" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-xl text-white shadow-lg mb-3">إنشاء حساب جديد 📝</button>
-        <button onclick="guestLogin()" class="w-full bg-slate-700 hover:bg-slate-600 font-bold py-2.5 rounded-xl text-amber-300 text-sm border border-slate-600">👤 اللعب كضيف سريع</button>
+    <!-- شاشة اللوبي الدخول كضيف -->
+    <div id="loginScreen" class="bg-slate-800 p-6 rounded-2xl w-full max-w-sm text-center">
+        <h2 class="text-2xl font-bold mb-4 text-amber-400">🎮 إنسان حيوان نبات</h2>
+        <button onclick="socket.emit('guest_login')" class="w-full bg-emerald-600 font-bold py-3 rounded-xl text-white">دخول سريع للعبة 🚀</button>
     </div>
 
-    <!-- شاشة تسجيل الدخول -->
-    <div id="loginScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <h2 class="text-xl font-bold mb-3 text-amber-400">🔑 تسجيل الدخول</h2>
-        <input type="text" id="loginId" placeholder="البريد أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
-        <input type="password" id="loginPass" placeholder="كلمة المرور" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-sm">
-        <button onclick="submitLogin()" class="w-full bg-emerald-600 font-bold py-3 rounded-xl text-white shadow-lg mb-2">دخول 🚀</button>
-        <button onclick="showScreen('authChoiceScreen')" class="text-xs text-slate-400 underline mt-2">← رجوع</button>
+    <!-- الشاشة الرئيسية -->
+    <div id="lobbyScreen" class="hidden bg-slate-800 p-6 rounded-2xl w-full max-w-md text-center">
+        <h3 class="text-xl font-bold text-amber-400 mb-6">ساحة اللعب الجماعية</h3>
+        <button onclick="startMatch()" class="bg-amber-500 text-slate-900 font-extrabold text-3xl w-40 h-40 rounded-full shadow-2xl border-4 border-amber-300">لعب</button>
     </div>
 
-    <!-- شاشة إنشاء حساب -->
-    <div id="registerScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <h2 class="text-xl font-bold mb-3 text-amber-400">📝 حساب جديد</h2>
-        <input type="text" id="regId" placeholder="البريد أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
-        <input type="password" id="regPass" placeholder="كلمة المرور" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
-        <input type="text" id="regName" placeholder="اسم المستخدم" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-sm">
-        <button onclick="submitRegister()" class="w-full bg-blue-600 font-bold py-3 rounded-xl text-white shadow-lg mb-2">تسجيل وحفظ 🚀</button>
-        <button onclick="showScreen('authChoiceScreen')" class="text-xs text-slate-400 underline mt-2">← رجوع</button>
+    <!-- 1. شاشة الانتظار مع العداد الحقيقي (1/5 إلى 5/5) -->
+    <div id="searchingScreen" class="hidden bg-slate-800 p-6 rounded-2xl w-full max-w-sm text-center">
+        <div class="text-4xl mb-3">👥</div>
+        <h3 class="text-lg font-bold text-amber-300 mb-2">جاري تجميع اللاعبين...</h3>
+        <!-- العداد الحقيقي بالظهور رقم برقم -->
+        <div id="queueCounter" class="text-3xl font-extrabold text-emerald-400 tracking-widest my-4">1 / 5</div>
+        <button onclick="location.reload()" class="bg-rose-600 text-xs px-4 py-2 rounded-xl">إلغاء</button>
     </div>
 
-    <!-- الشاشة الرئيسية (Lobby) -->
-    <div id="lobbyScreen" class="hidden bg-[#0d1b2a] border border-slate-800 p-4 rounded-3xl w-full max-w-lg min-h-[90vh] shadow-2xl relative flex flex-col items-center justify-between">
-        
-        <div class="w-full flex justify-between items-center bg-slate-900/80 p-2.5 rounded-2xl text-xs border border-slate-700">
-            <div class="flex items-center gap-1 font-bold text-rose-400">🎟️ <span>118</span></div>
-            <div class="flex items-center gap-1 font-bold text-amber-400">🪙 <span id="cashCount">15</span></div>
-            <div class="flex items-center gap-1 font-bold text-amber-200">👑 <span>0</span></div>
-            <div class="flex items-center gap-1 font-bold text-emerald-400">❤️ <span>5/5</span></div>
-        </div>
-
-        <div class="w-full bg-slate-800/80 p-3 rounded-2xl flex justify-between items-center border border-slate-700">
-            <span class="text-xs text-slate-300">المركز الأول: <b class="text-amber-400">saeed2222</b></span>
-            <span class="text-xs bg-slate-900 px-2 py-1 rounded text-amber-300 font-mono">2414 نقطة</span>
-        </div>
-
-        <div class="absolute left-4 top-28 flex flex-col gap-3">
-            <button onclick="claimDaily()" class="bg-amber-600 hover:bg-amber-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
-                <span>🎁</span><span class="mt-1 font-bold">هدايا يومية</span>
-            </button>
-            <button onclick="openFriendsModal()" class="bg-sky-600 hover:bg-sky-500 p-2 rounded-2xl text-xs flex flex-col items-center shadow-lg w-20">
-                <span>👥</span><span class="mt-1 font-bold">الأصدقاء</span>
-            </button>
-        </div>
-
-        <div class="my-auto flex flex-col items-center">
-            <button onclick="startMatch()" class="pinball-circle w-44 h-44 rounded-full shadow-2xl flex flex-col items-center justify-center border-4 border-amber-300 transform hover:scale-105 transition">
-                <span class="text-4xl font-extrabold text-slate-900">لعب</span>
-            </button>
-            
-            <button onclick="createPrivateRoom()" class="mt-6 bg-rose-600 hover:bg-rose-500 font-bold px-10 py-3 rounded-xl shadow-lg text-white border border-rose-500 text-sm">
-                🔒 خاص (حتى 7 لاعبين)
-            </button>
-        </div>
-
-        <div class="text-xs text-slate-500">منصة الألعاب الجماعية الأصلية</div>
+    <!-- 2. حركة اختيار الحرف العشوائية (الروليت) -->
+    <div id="rouletteScreen" class="hidden bg-slate-800 p-6 rounded-2xl w-full max-w-sm text-center">
+        <h3 class="text-sm font-bold text-slate-400 mb-2">جاري اختيار الحرف عشوائياً...</h3>
+        <div id="rouletteLetter" class="roulette-box my-6">أ</div>
     </div>
 
-    <!-- نافذة الأصدقاء -->
-    <div id="friendsModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
-            <h3 class="font-bold text-amber-400 mb-3">دعوة الأصدقاء</h3>
-            <input type="text" id="friendPhoneInput" placeholder="رقم الجوال..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-white text-sm mb-3">
-            <button onclick="sendInvite()" class="w-full bg-emerald-600 font-bold py-2.5 rounded-xl text-white text-sm mb-2">إرسال دعوة 📲</button>
-            <button onclick="closeFriendsModal()" class="w-full bg-slate-700 text-white py-2 rounded-xl text-sm">إغلاق</button>
-        </div>
-    </div>
-
-    <!-- شاشة البحث السريع -->
-    <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
-        <div class="text-4xl mb-3 animate-spin">⏳</div>
-        <h3 class="text-base font-bold text-amber-300 mb-2">جاري البحث عن لاعبين (حد أقصى 5)...</h3>
-        <button onclick="location.reload()" class="bg-rose-600 text-white py-2 px-6 rounded-xl text-xs font-bold">إلغاء</button>
-    </div>
-
-    <!-- شاشة الغرفة الخاصة -->
-    <div id="privateRoomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
-        <h3 class="font-bold text-amber-400 mb-2">🔒 الغرفة الخاصة (حتى 7 لاعبين)</h3>
-        <div class="bg-slate-900 p-3 rounded-xl font-mono text-xl text-emerald-400 font-bold mb-3" id="roomCodeDisplay">-----</div>
-        <button onclick="location.reload()" class="w-full bg-rose-600 text-white py-2.5 rounded-xl text-sm font-bold">مغادرة الغرفة</button>
-    </div>
-
-    <!-- شاشة اللعب النشطة مع الفحص الدقيق والعد التنازلي وزر الخروج -->
-    <div id="gameScreen" class="hidden bg-[#0d1b2a] border border-slate-700 p-4 rounded-2xl w-full max-w-4xl shadow-2xl relative">
-        <button onclick="location.reload()" class="absolute top-4 left-4 bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold">خروج 🚪</button>
-
-        <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2 text-xs pt-2">
-            <span id="roundBadge" class="bg-slate-900 px-3 py-1 rounded-full text-slate-300 font-bold">الجولة 1 من 3</span>
-            <span id="letterBadge" class="text-xl font-extrabold text-amber-400">الحرف: أ</span>
+    <!-- 3. شاشة اللعب والـ 60 ثانية زر التسليم -->
+    <div id="gameScreen" class="hidden bg-slate-900 p-4 rounded-2xl w-full max-w-2xl">
+        <div class="flex justify-between items-center mb-3 text-xs border-b border-slate-700 pb-2">
+            <span id="roundBadge" class="font-bold text-amber-400">الجولة 1 من 3</span>
+            <span id="targetLetter" class="text-xl font-extrabold text-amber-300">الحرف: -</span>
             <span id="timerBadge" class="text-rose-400 font-bold">⏱️ 60 ثانية</span>
         </div>
 
-        <div class="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-slate-700" id="gamePlayersBar"></div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="md:col-span-2 space-y-2" id="categoriesBox"></div>
-
-            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col h-44">
-                <h4 class="text-xs font-bold text-sky-400 mb-1 border-b border-slate-800 pb-1">💬 الشات العام</h4>
-                <div id="chatBox" class="flex-1 overflow-y-auto space-y-1 text-xs mb-2 text-right"></div>
-                <div class="flex gap-1">
-                    <input type="text" id="chatInput" placeholder="اكتب..." class="w-full bg-slate-800 p-1.5 rounded text-xs text-white">
-                    <button onclick="sendChat()" class="bg-sky-600 px-3 py-1 rounded text-xs font-bold">إرسال</button>
-                </div>
-            </div>
-        </div>
+        <div id="categoriesInputs" class="space-y-2 mb-4"></div>
+        <button onclick="submitAnswers()" class="w-full bg-emerald-600 font-bold py-3 rounded-xl shadow-lg">تسليم الإجابات 🚀</button>
     </div>
 
-    <!-- شاشة النتائج النهائية -->
-    <div id="finalScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
-        <h2 class="text-xl font-bold text-amber-400 mb-3">🏆 لوحة الفائزين النهائية</h2>
-        <ol id="podiumList" class="space-y-2 text-right bg-slate-900 p-4 rounded-xl text-xs mb-4"></ol>
-        <button onclick="location.reload()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm">العودة للرئيسية 🏠</button>
+    <!-- 4. شاشة التصحيح الجماعي المتبادل بين اللاعبين -->
+    <div id="reviewScreen" class="hidden bg-slate-800 p-4 rounded-2xl w-full max-w-4xl text-center">
+        <h3 class="text-lg font-bold text-amber-400 mb-2">📋 صحح إجابات منافسيك (اضغط صح أو خطأ)</h3>
+        <p class="text-xs text-slate-400 mb-4">صحين = 10 نقاط | صح وخطأ = 5 نقاط | خطأين = 0</p>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-right border-collapse">
+                <thead>
+                    <tr class="bg-slate-900 text-amber-300 border-b border-slate-700">
+                        <th class="p-2">اللاعب</th>
+                        <th class="p-2">إنسان</th>
+                        <th class="p-2">حيوان</th>
+                        <th class="p-2">نبات</th>
+                        <th class="p-2">جماد</th>
+                        <th class="p-2">بلاد</th>
+                    </tr>
+                </thead>
+                <tbody id="reviewTableBody"></tbody>
+            </table>
+        </div>
+
+        <button onclick="finishReview()" class="w-full mt-4 bg-blue-600 font-bold py-3 rounded-xl text-white">اعتماد النتيجة والانتقال للجولة التالية ⏭️</button>
     </div>
 
     <script>
         const socket = io();
-        let currentTargetLetter = '';
-        let roundTimerInterval;
+        let currentLetter = 'أ';
+        let categories = [];
 
-        function showScreen(screenId) {
-            ['authChoiceScreen', 'loginScreen', 'registerScreen', 'lobbyScreen'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-            document.getElementById(screenId).classList.remove('hidden');
-        }
-
-        function submitRegister() {
-            const identifier = document.getElementById('regId').value;
-            const password = document.getElementById('regPass').value;
-            const username = document.getElementById('regName').value;
-            socket.emit('register_user', { identifier, password, username });
-        }
-
-        function submitLogin() {
-            const identifier = document.getElementById('loginId').value;
-            const password = document.getElementById('loginPass').value;
-            socket.emit('login_user', { identifier, password });
-        }
-
-        function guestLogin() { socket.emit('guest_login'); }
-
-        socket.on('auth_success', (data) => {
-            showScreen('lobbyScreen');
-            document.getElementById('cashCount').innerText = data.cash;
+        socket.on('auth_success', () => {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.remove('hidden');
         });
-        socket.on('auth_error', (msg) => alert(msg));
-
-        function claimDaily() { socket.emit('claim_daily'); }
-        socket.on('daily_result', (data) => {
-            alert(data.msg);
-            if(data.success) document.getElementById('cashCount').innerText = data.cash;
-        });
-
-        function openFriendsModal() { document.getElementById('friendsModal').classList.remove('hidden'); }
-        function closeFriendsModal() { document.getElementById('friendsModal').classList.add('hidden'); }
-        function sendInvite() {
-            const phone = document.getElementById('friendPhoneInput').value;
-            if(!phone) return alert('أدخل رقم الجوال');
-            socket.emit('invite_friend', { friendPhone: phone });
-        }
-        socket.on('invite_sent', (msg) => { alert(msg); closeFriendsModal(); });
 
         function startMatch() {
             document.getElementById('lobbyScreen').classList.add('hidden');
@@ -189,107 +92,99 @@
             socket.emit('start_matchmaking');
         }
 
-        function createPrivateRoom() {
-            document.getElementById('lobbyScreen').classList.add('hidden');
-            socket.emit('create_private_room');
-        }
-
-        socket.on('private_room_created', (code) => {
-            document.getElementById('privateRoomScreen').classList.remove('hidden');
-            document.getElementById('roomCodeDisplay').innerText = code;
+        // تحديث العداد الحقيقي 1/5، 2/5...
+        socket.on('queue_update', (data) => {
+            document.getElementById('queueCounter').innerText = `${data.count} / ${data.max}`;
         });
 
-        socket.on('match_started', (players) => {
+        socket.on('match_started', () => {
             document.getElementById('searchingScreen').classList.add('hidden');
-            document.getElementById('privateRoomScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('rouletteScreen').classList.remove('hidden');
+
+            // تأثير الروليت للحرف العشوائي
+            const letters = ['أ', 'ب', 'ت', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ط', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];
+            let count = 0;
+            const interval = setInterval(() => {
+                document.getElementById('rouletteLetter').innerText = letters[Math.floor(Math.random() * letters.length)];
+                count++;
+                if (count > 15) {
+                    clearInterval(interval);
+                }
+            }, 100);
         });
 
         socket.on('start_round_data', (data) => {
-            document.getElementById('roundBadge').innerText = `الجولة ${data.round} من ${data.total}`;
-            document.getElementById('letterBadge').innerText = `الحرف: ${data.letter}`;
-            currentTargetLetter = data.letter;
+            setTimeout(() => {
+                document.getElementById('rouletteScreen').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+                document.getElementById('targetLetter').innerText = `الحرف: ${data.letter}`;
+                currentLetter = data.letter;
+                categories = data.categories;
 
-            const box = document.getElementById('categoriesBox');
-            box.innerHTML = '';
-            data.categories.forEach(cat => {
-                box.innerHTML += `
-                    <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700 flex items-center gap-2">
-                        <span class="text-xs font-bold text-amber-300 w-16">${cat}</span>
-                        <input type="text" id="inp_${cat}" placeholder="بحرف ${data.letter}..." class="w-full bg-slate-900 border border-slate-700 p-2 rounded text-white text-xs">
-                        <button onclick="checkCatBox('${cat}')" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-white font-bold text-sm">✓</button>
-                        <span id="chk_${cat}" class="text-lg"></span>
-                    </div>
-                `;
+                const box = document.getElementById('categoriesInputs');
+                box.innerHTML = '';
+                data.categories.forEach(cat => {
+                    box.innerHTML += `
+                        <div class="flex items-center gap-2 bg-slate-800 p-2 rounded-xl">
+                            <span class="w-16 font-bold text-xs text-amber-300">${cat}</span>
+                            <input type="text" id="ans_${cat}" placeholder="بحرف ${data.letter}..." class="w-full bg-slate-900 p-2 rounded text-xs text-white">
+                        </div>
+                    `;
+                });
+            }, 1800);
+        });
+
+        function submitAnswers() {
+            const ans = {};
+            categories.forEach(cat => {
+                ans[cat] = document.getElementById(`ans_${cat}`).value;
             });
-            renderGamePlayers(data.players);
-
-            let timeLeft = 60;
-            const timerEl = document.getElementById('timerBadge');
-            clearInterval(roundTimerInterval);
-            roundTimerInterval = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = `⏱️ ${timeLeft} ثانية`;
-                if(timeLeft <= 0) clearInterval(roundTimerInterval);
-            }, 1000);
-        });
-
-        // التحقق الذكي والدقيق للإجابة عند الضغط على زر الصح
-        function checkCatBox(cat) {
-            const val = document.getElementById(`inp_${cat}`).value;
-            if(!val.trim()) return;
-            socket.emit('verify_answer_box', { category: cat, word: val, letter: currentTargetLetter });
+            socket.emit('submit_answers', ans);
         }
 
-        socket.on('answer_box_result', (res) => {
-            const chkSpan = document.getElementById(`chk_${res.category}`);
-            const inputField = document.getElementById(`inp_${res.category}`);
-            if(res.isValid) {
-                chkSpan.innerText = '✅';
-                inputField.disabled = true;
-            } else {
-                chkSpan.innerText = '❌';
-                setTimeout(() => { inputField.value = ''; chkSpan.innerText = ''; }, 900);
-            }
-        });
-
-        function renderGamePlayers(players) {
-            const bar = document.getElementById('gamePlayersBar');
-            bar.innerHTML = '';
-            players.forEach(p => {
-                bar.innerHTML += `
-                    <div class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-center min-w-[80px]">
-                        <div class="text-xs font-bold text-amber-300">${p.username}</div>
-                        <div class="text-[10px] text-emerald-400">${p.score} نقطة</div>
-                    </div>
-                `;
-            });
-        }
-
-        function sendChat() {
-            const inp = document.getElementById('chatInput');
-            if(!inp.value.trim()) return;
-            socket.emit('send_chat', inp.value);
-            inp.value = '';
-        }
-
-        socket.on('new_chat', (data) => {
-            const box = document.getElementById('chatBox');
-            box.innerHTML += `<div><span class="text-amber-400 font-bold">${data.username}:</span> ${data.msg}</div>`;
-            box.scrollTop = box.scrollHeight;
-        });
-
-        socket.on('game_over', (players) => {
-            clearInterval(roundTimerInterval);
+        // فتح شاشة التصحيح الجماعي وتعبئة إجابات باقي اللاعبين
+        socket.on('open_review_phase', (players) => {
             document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('finalScreen').classList.remove('hidden');
-            const list = document.getElementById('podiumList');
-            list.innerHTML = '';
-            players.forEach((p, i) => {
-                let m = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
-                list.innerHTML += `<li class="flex justify-between py-1 border-b border-slate-800"><span>${m} ${p.username}</span><span class="text-amber-400">${p.score} نقطة</span></li>`;
+            document.getElementById('reviewScreen').classList.remove('hidden');
+
+            const tbody = document.getElementById('reviewTableBody');
+            tbody.innerHTML = '';
+
+            players.forEach(p => {
+                // لا يصحح اللاعب إجابات نفسه
+                if (p.socketId !== socket.id) {
+                    let row = `<tr class="border-b border-slate-700">
+                        <td class="p-2 font-bold text-amber-400">${p.username}</td>`;
+
+                    categories.forEach(cat => {
+                        const word = p.answers[cat] || 'لا يوجد';
+                        row += `
+                            <td class="p-2">
+                                <div class="text-xs mb-1">${word}</div>
+                                <div class="flex gap-1 justify-center">
+                                    <button onclick="vote('${p.socketId}', '${cat}', true, this)" class="bg-emerald-600 px-2 py-0.5 rounded text-white font-bold">✓</button>
+                                    <button onclick="vote('${p.socketId}', '${cat}', false, this)" class="bg-rose-600 px-2 py-0.5 rounded text-white font-bold">✕</button>
+                                </div>
+                            </td>
+                        `;
+                    });
+                    row += `</tr>`;
+                    tbody.innerHTML += row;
+                }
             });
         });
+
+        function vote(targetSocketId, category, isApproved, btn) {
+            socket.emit('vote_answer', { targetSocketId, category, isApproved });
+            btn.parentElement.querySelectorAll('button').forEach(b => b.classList.add('opacity-40'));
+            btn.classList.remove('opacity-40');
+            btn.classList.add('ring-2', 'ring-white');
+        }
+
+        function finishReview() {
+            socket.emit('finish_review_phase');
+            alert('تم اعتماد التصحيح الجماعي بنجاح!');
+        }
     </script>
 </body>
 </html>

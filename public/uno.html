@@ -3,54 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة أونو (UNO) الرسمية</title>
+    <title>لعبة أونو (UNO) الحقيقية</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         body { background-color: #0f172a; color: #ffffff; font-family: Tahoma, sans-serif; }
-        .uno-card { width: 75px; height: 110px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .uno-card:hover { transform: translateY(-8px); }
+        /* تصميم كارت أونو الحقيقي الواقعي */
+        .uno-card-real {
+            width: 85px;
+            height: 125px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            border: 4px solid #ffffff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            user-select: none;
+        }
+        .uno-card-real:hover { transform: translateY(-10px); box-shadow: 0 12px 20px rgba(0,0,0,0.6); }
+        .uno-oval {
+            width: 65px;
+            height: 95px;
+            border-radius: 50% / 40%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+            transform: rotate(-25deg);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-between p-4">
 
-    <!-- شاشة البداية وقوانين الأونو -->
+    <!-- شاشة البداية والاختيار -->
     <div id="unoStart" class="bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-md shadow-2xl text-center my-auto">
-        <h1 class="text-4xl font-extrabold text-rose-500 mb-2">🃏 لعبة أونو (UNO)</h1>
-        <p class="text-xs text-slate-300 mb-4">108 بطاقة، مطابقة الألوان والأرقام، وتحدي الـ +4!</p>
-        
-        <div class="bg-slate-900 p-3 rounded-2xl text-right text-xs text-slate-300 space-y-1.5 mb-5 border border-slate-700">
-            <div class="font-bold text-amber-400 mb-1">📜 قوانين اللعب:</div>
-            <div>• <b>المطابقة:</b> العب ورقة تطابق اللون أو الرقم للبطاقة المكشوفة.</div>
-            <div>• <b>البطاقات الخاصة:</b> +2، التخطي (Skip)، والعكس (Reverse).</div>
-            <div>• <b>كلمة أونو:</b> اضغط زر "أونو!" فوراً عند تبقي ورقة واحدة لديك!</div>
-        </div>
+        <h1 class="text-4xl font-extrabold text-rose-500 mb-2">🃏 أونو (UNO) الرسمية</h1>
+        <p class="text-xs text-slate-300 mb-6">لعب جماعي مع أصدقائك أو روبوتات ذكية!</p>
 
         <input type="text" id="unoPlayerName" placeholder="اكتب اسمك للبدء..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-center text-sm font-bold">
-        <button onclick="startUnoGame()" class="w-full bg-rose-600 hover:bg-rose-500 font-extrabold py-3.5 rounded-xl shadow-lg text-white text-base">بدء لعبة الأونو 🚀</button>
-        <a href="index.html" class="block mt-4 text-xs text-slate-400 underline">← العودة للرئيسية ومنصة الألعاب</a>
+        
+        <button onclick="startUnoMultiplayer()" class="w-full bg-rose-600 hover:bg-rose-500 font-extrabold py-3.5 rounded-xl shadow-lg text-white text-base mb-3">بحث سريع (جماعي / بوتات) 🚀</button>
+        <button onclick="createUnoPrivateRoom()" class="w-full bg-slate-700 hover:bg-slate-600 font-bold py-3 rounded-xl text-amber-300 text-sm mb-4">إنشاء غرفة خاصة 🔒</button>
+        <a href="index.html" class="block text-xs text-slate-400 underline">← العودة للرئيسية</a>
     </div>
 
-    <!-- شاشة اللعب النشطة -->
+    <!-- شاشة الانتظار -->
+    <div id="unoSearching" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-sm text-center my-auto">
+        <div class="text-4xl mb-3 animate-spin">⏳</div>
+        <h3 class="text-base font-bold text-amber-300 mb-2">جاري البحث عن لاعبين...</h3>
+        <button onclick="location.reload()" class="bg-rose-600 text-white py-2 px-6 rounded-xl text-xs font-bold mt-3">إلغاء</button>
+    </div>
+
+    <!-- شاشة اللعب النشطة للأونو بالأوراق الواقعية الملونة -->
     <div id="unoGameScreen" class="hidden w-full max-w-4xl flex flex-col justify-between min-h-[90vh]">
-        
-        <!-- الشريط العلوي -->
         <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700 text-xs">
             <span id="unoPlayerBadge" class="font-bold text-amber-400">اللاعب: -</span>
-            <span class="text-emerald-400 font-bold" id="unoScoreDisplay">نقاط الجولة: 0</span>
-            <button onclick="location.reload()" class="bg-rose-600 text-white px-3 py-1 rounded-lg font-bold">خروج 🚪</button>
+            <span class="text-emerald-400 font-bold" id="unoTurnIndicator">دور اللاعب: أنت</span>
+            <button onclick="location.reload()" class="bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold">خروج 🚪</button>
         </div>
 
-        <!-- ساحة الطاولة (الكومة والبطاقة المكشوفة) -->
-        <div class="flex justify-center items-center gap-8 my-auto py-8">
+        <!-- طاولة اللعب والأوراق الواقعية -->
+        <div class="flex justify-center items-center gap-10 my-auto py-8">
             <!-- كومة السحب -->
-            <div onclick="drawCard()" class="uno-card bg-slate-700 border-2 border-dashed border-amber-400 flex flex-col items-center justify-center text-amber-300 text-xs select-none hover:bg-slate-600">
-                <span>📦 سحب</span>
-                <span id="deckCount" class="text-[10px] mt-1">50 ورقة</span>
+            <div onclick="drawCard()" class="uno-card-real bg-slate-900 text-amber-400 border-dashed text-xs select-none hover:bg-slate-800">
+                <span class="text-lg">📦</span>
+                <span class="text-[10px] mt-2">سحب ورقة</span>
             </div>
 
-            <!-- كومة الرمي (البطاقة الحالية) -->
-            <div id="currentDiscardCard" class="uno-card bg-red-600 text-white text-xl">
-                <span>7</span>
+            <!-- الكومة المكشوفة (الورقة الحالية) -->
+            <div id="currentDiscardCard" class="uno-card-real text-white">
+                <div id="discardOval" class="uno-oval bg-white text-red-600 text-3xl font-black">7</div>
             </div>
         </div>
 
@@ -60,113 +87,113 @@
                 <span class="text-xs font-bold text-slate-300">أوراقك في اليد:</span>
                 <button onclick="shoutUno()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-1.5 rounded-xl text-xs animate-bounce">📢 أونو! (UNO)</button>
             </div>
-            
-            <div id="playerHand" class="flex gap-2 overflow-x-auto w-full py-2 min-h-[130px] justify-center"></div>
+            <div id="playerHand" class="flex gap-3 overflow-x-auto w-full py-2 min-h-[140px] justify-center"></div>
         </div>
     </div>
 
-    <!-- شاشة الفوز بالنهاية -->
-    <div id="unoEndScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-sm shadow-2xl text-center my-auto">
-        <h2 class="text-2xl font-bold text-amber-400 mb-3" id="unoEndTitle">🏆 فزت بالجولة!</h2>
-        <p class="text-sm text-slate-300 mb-4" id="unoEndScore">حصلت على 50 نقطة</p>
-        <button onclick="location.reload()" class="w-full bg-rose-600 text-white font-bold py-3 rounded-xl mb-2">لعب جولة جديدة 🔄</button>
-        <a href="index.html" class="text-xs text-slate-400 underline">العودة للرئيسية</a>
-    </div>
-
     <script>
+        const socket = io();
         let hand = [];
         let topCard = {};
-        let deckCount = 50;
-        let unoCalled = false;
-        const colors = ['red', 'green', 'blue', 'yellow'];
-        const colorCodes = { red: '#dc2626', green: '#16a34a', blue: '#2563eb', yellow: '#ca8a04' };
+        const colors = ['red', 'blue', 'green', 'yellow'];
+        const colorHex = { red: '#D32F2F', blue: '#1976D2', green: '#388E3C', yellow: '#FBC02D' };
 
-        function startUnoGame() {
+        function startUnoMultiplayer() {
             const name = document.getElementById('unoPlayerName').value.trim();
             if(!name) return alert('أدخل اسمك أولاً!');
             document.getElementById('unoPlayerBadge').innerText = `اللاعب: ${name}`;
             document.getElementById('unoStart').classList.add('hidden');
-            document.getElementById('unoGameScreen').classList.remove('hidden');
-
-            // بدء توزيع 7 أوراق
-            initUnoGame();
+            document.getElementById('unoSearching').classList.remove('hidden');
+            socket.emit('uno_matchmaking');
         }
 
-        function initUnoGame() {
+        function createUnoPrivateRoom() {
+            const name = document.getElementById('unoPlayerName').value.trim();
+            if(!name) return alert('أدخل اسمك أولاً!');
+            socket.emit('create_private_room');
+        }
+
+        socket.on('private_room_created', (code) => {
+            alert(`تم إنشاء الغرفة الخاصة بنجاح! كود الغرفة: ${code}`);
+            document.getElementById('unoStart').classList.add('hidden');
+            document.getElementById('unoSearching').classList.remove('hidden');
+        });
+
+        socket.on('uno_start_game', (data) => {
+            document.getElementById('unoSearching').classList.add('hidden');
+            document.getElementById('unoGameScreen').classList.remove('hidden');
+            initGameCards();
+        });
+
+        function initGameCards() {
             hand = [];
             for(let i=0; i<7; i++) {
-                hand.push(randomCard());
+                hand.push(randomRealCard());
             }
-            topCard = { color: colors[Math.floor(Math.random()*colors.length)], value: Math.floor(Math.random()*10) };
-            renderGame();
+            topCard = randomRealCard();
+            renderRealGame();
         }
 
-        function randomCard() {
+        function randomRealCard() {
             const color = colors[Math.floor(Math.random() * colors.length)];
-            const valTypes = ['0','1','2','3','4','5','6','7','8','9','+2','تخطي','عكس'];
-            const value = valTypes[Math.floor(Math.random() * valTypes.length)];
+            const values = ['0','1','2','3','4','5','6','7','8','9','+2','تخطي'];
+            const value = values[Math.floor(Math.random() * values.length)];
             return { color, value };
         }
 
-        function renderGame() {
+        function renderRealGame() {
             const handDiv = document.getElementById('playerHand');
             handDiv.innerHTML = '';
 
             hand.forEach((card, index) => {
+                const bgCol = colorHex[card.color];
                 const cardEl = document.createElement('div');
-                cardEl.className = 'uno-card text-white text-base';
-                cardEl.style.backgroundColor = colorCodes[card.color];
-                cardEl.innerHTML = `<span class="text-xs font-mono">${card.color.toUpperCase()}</span><span class="text-xl font-bold my-auto">${card.value}</span>`;
-                cardEl.onclick = () => playCard(index);
+                cardEl.className = 'uno-card-real text-white';
+                cardEl.style.backgroundColor = bgCol;
+                cardEl.innerHTML = `
+                    <div class="absolute top-1 left-2 text-[10px]">${card.value}</div>
+                    <div class="uno-oval bg-white text-slate-900 text-2xl font-black" style="color: ${bgCol};">${card.value}</div>
+                    <div class="absolute bottom-1 right-2 text-[10px]">${card.value}</div>
+                `;
+                cardEl.onclick = () => playRealCard(index);
                 handDiv.appendChild(cardEl);
             });
 
-            // تحديث الكومة
-            const discardEl = document.getElementById('currentDiscardCard');
-            discardEl.style.backgroundColor = colorCodes[topCard.color];
-            discardEl.innerHTML = `<span class="text-[10px] font-mono">${topCard.color.toUpperCase()}</span><span class="text-2xl font-bold my-auto">${topCard.value}</span>`;
-            document.getElementById('deckCount').innerText = `${deckCount} ورقة`;
+            // تحديث الكومة المكشوفة بتصميم واقعي
+            const discardBg = colorHex[topCard.color];
+            const discardCard = document.getElementById('currentDiscardCard');
+            discardCard.style.backgroundColor = discardBg;
+            const oval = document.getElementById('discardOval');
+            oval.style.color = discardBg;
+            oval.innerText = topCard.value;
         }
 
-        function playCard(index) {
+        function playRealCard(index) {
             const card = hand[index];
-            // قاعدة المطابقة: اللون أو القيمة
-            if(card.color === topCard.color || card.value === topCard.value || card.value === 'مبدل') {
+            if(card.color === topCard.color || card.value === topCard.value) {
                 topCard = card;
                 hand.splice(index, 1);
-
-                if(hand.length === 1 && !unoCalled) {
-                    alert('⚠️ نسيت قول "أونو!" - عقوبة سحب ورقتين!');
-                    hand.push(randomCard());
-                    hand.push(randomCard());
-                }
-
                 if(hand.length === 0) {
-                    document.getElementById('unoGameScreen').classList.add('hidden');
-                    document.getElementById('unoEndScreen').classList.remove('hidden');
-                    document.getElementById('unoEndTitle').innerText = '🎉 مبروك فزت بالجولة!';
-                    document.getElementById('unoEndScore').innerText = 'جمعت النقاط وتخلصت من كل أوراقك!';
+                    alert('🎉 تهانينا! لقد فزت بلعبة الأونو وتخلصت من جميع أوراقك!');
+                    location.reload();
                     return;
                 }
-
-                renderGame();
+                renderRealGame();
             } else {
                 alert('❌ هذه الورقة لا تطابق اللون أو الرقم الحالي!');
             }
         }
 
         function drawCard() {
-            hand.push(randomCard());
-            deckCount = Math.max(1, deckCount - 1);
-            renderGame();
+            hand.push(randomRealCard());
+            renderRealGame();
         }
 
         function shoutUno() {
             if(hand.length === 1) {
-                unoCalled = true;
-                alert('📢 قلت أونو بنجاح! رائع!');
+                alert('📢 أونو! (UNO) - أعلنت الفوز الوشيك!');
             } else {
-                alert('⚠️ يمكنك قول أونو فقط عندما يتبقى لديك ورقة واحدة!');
+                alert('⚠️ يمكنك قول أونو فقط عند تبقي ورقة واحدة بيديك!');
             }
         }
     </script>

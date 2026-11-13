@@ -14,7 +14,6 @@ const arabicLetters = ['أ', 'ب', 'ت', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش
 const categories = ['إنسان', 'حيوان', 'نبات', 'جماد', 'بلاد'];
 
 let matchmakingQueue = [];
-let unoQueue = [];
 const rooms = {};
 
 io.on('connection', (socket) => {
@@ -43,7 +42,7 @@ io.on('connection', (socket) => {
         socket.emit('auth_success', { username: socket.username, cash: 15, score: 100 });
     });
 
-    // --- نظام إنسان حيوان نبات (جماعي + بوتات + غرف) ---
+    // 1. البحث السريع (بحد أقصى 5 لاعبين والعداد التنازلي)
     socket.on('start_matchmaking', () => {
         matchmakingQueue.push(socket);
         broadcastQueueCount();
@@ -99,43 +98,98 @@ io.on('connection', (socket) => {
         startRound(roomCode);
     }
 
-    // --- نظام الأونو الجماعي والغرف ---
-    socket.on('uno_matchmaking', () => {
-        unoQueue.push(socket);
-        socket.unoTimer = setTimeout(() => {
-            const index = unoQueue.indexOf(socket);
-            if(index !== -1) {
-                unoQueue.splice(index, 1);
-                socket.emit('uno_start_game', { isBotGame: true, players: [socket.username, 'روبوت 1', 'روبوت 2'] });
-            }
-        }, 8000);
-
-        if(unoQueue.length >= 3) {
-            const group = unoQueue.splice(0, 3);
-            group.forEach(p => clearTimeout(p.unoTimer));
-            const playerNames = group.map(p => p.username);
-            group.forEach(p => p.emit('uno_start_game', { isBotGame: false, players: playerNames }));
-        }
-    });
-
+    // 2. إنشاء غرفة خاصة (حتى 7 لاعبين)
     socket.on('create_private_room', () => {
         const roomCode = 'PRIV_' + Math.random().toString(36).substring(2, 7).toUpperCase();
-        rooms[roomCode] = { code: roomCode, host: socket.username, players: [socket.username], max: 7 };
+        rooms[roomCode] = {
+            code: roomCode,
+            host: socket.username,
+            players: [{ socketId: socket.id, username: socket.username, score: 0, answers: {}, votes: {} }],
+            maxPlayers: 7,
+            currentRound: 1,
+            totalRounds: 3
+        };
         socket.join(roomCode);
+        socket.roomCode = roomCode;
         socket.emit('private_room_created', roomCode);
     });
 
+    // 3. الانضمام إلى غرفة خاصة عبر الكود
     socket.on('join_private_room', (code) => {
-        const room = rooms[code.trim().toUpperCase()];
-        if (!room) return socket.emit('error_msg', 'الغرفة غير موجودة');
-        room.players.push(socket.username);
+        const cleanCode = code.trim().toUpperCase();
+        const room = rooms[cleanCode];
+        if (!room) return socket.emit('error_msg', '❌ الغرفة غير موجودة تأكد من الكود');
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '❌ الغرفة ممتلئة (الحد الأقصى 7)');
+        
+        room.players.push({ socketId: socket.id, username: socket.username, score: 0, answers: {}, votes: {} });
         socket.join(room.code);
-        io.to(room.code).emit('update_room_players', room.players);
+        socket.roomCode = room.code;
+
+        // تحديث جميع اللاعبين في الغرفة باللاعبين الجدد
+        io.to(room.code).emit('update_room_lobby', room.players);
+    });
+
+    // بدء الغرفة الخاصة يدوياً من قبل المضيف
+    socket.on('start_private_game', (code) => {
+        const room = rooms[code];
+        if(room) {
+            io.to(room.code).emit('match_started', room.players);
+            startRound(room.code);
+        }
+    });
+
+    // تسليم الإجابات ومرحلة التصحيح الجماعي
+    socket.on('submit_answers', (answers) => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (player) {
+            player.answers = answers;
+            player.submitted = true;
+        }
+        io.to(room.code).emit('open_review_phase', room.players);
+    });
+
+    socket.on('vote_answer', ({ targetSocketId, category, isApproved }) => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        const target = room.players.find(p => p.socketId === targetSocketId);
+        if (target) {
+            if (!target.votes) target.votes = {};
+            if (!target.votes[category]) target.votes[category] = { yes: 0, no: 0 };
+            if (isApproved) target.votes[category].yes++;
+            else target.votes[category].no++;
+        }
+    });
+
+    socket.on('finish_review_phase', () => {
+        const room = rooms[socket.roomCode];
+        if (!room || room.calculated) return;
+        room.calculated = true;
+
+        room.players.forEach(p => {
+            let roundPoints = 0;
+            categories.forEach(cat => {
+                const v = (p.votes && p.votes[cat]) ? p.votes[cat] : { yes: 2, no: 0 };
+                if (v.yes >= 2) roundPoints += 10;
+                else if (v.yes === 1 && v.no === 1) roundPoints += 5;
+                else roundPoints += 0;
+            });
+            p.score += roundPoints;
+        });
+
+        room.currentRound++;
+        if (room.currentRound > room.totalRounds) {
+            room.players.sort((a,b) => b.score - a.score);
+            io.to(room.code).emit('game_over', room.players);
+            delete rooms[room.code];
+        } else {
+            startRound(room.code);
+        }
     });
 
     socket.on('disconnect', () => {
         matchmakingQueue = matchmakingQueue.filter(p => p.id !== socket.id);
-        unoQueue = unoQueue.filter(p => p.id !== socket.id);
         broadcastQueueCount();
     });
 });
@@ -143,7 +197,9 @@ io.on('connection', (socket) => {
 function startRound(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
+    room.calculated = false;
     room.currentLetter = arabicLetters[Math.floor(Math.random() * arabicLetters.length)];
+    
     io.to(roomCode).emit('start_round_data', {
         round: room.currentRound,
         total: room.totalRounds,

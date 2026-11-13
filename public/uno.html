@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة أونو (UNO) التفاعلية مع البوتات</title>
+    <title>لعبة أونو (UNO) التفاعلية الواقعية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { background-color: #0f172a; color: #ffffff; font-family: Tahoma, sans-serif; overflow-x: hidden; }
         
+        /* تصميم كارت أونو الواقعي */
         .uno-card-real {
             width: 80px;
             height: 115px;
@@ -25,8 +26,9 @@
             transition: transform 0.2s, box-shadow 0.2s;
             user-select: none;
         }
-        .uno-card-real:hover { transform: translateY(-12px) scale(1.05); box-shadow: 0 14px 24px rgba(0,0,0,0.7); }
+        .uno-card-real:hover { transform: translateY(-14px) scale(1.06); box-shadow: 0 16px 26px rgba(0,0,0,0.7); }
         
+        /* ظهر الكارت للمنافسين */
         .uno-card-back {
             width: 45px;
             height: 70px;
@@ -52,42 +54,46 @@
             transform: rotate(-20deg);
         }
 
-        @keyframes slideIn {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        /* حركة طيران الورقة عند اللعب للحقيقة والواقعية */
+        @keyframes flyToCenter {
+            0% { transform: translateY(80px) scale(0.8); opacity: 0.5; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
         }
-        .card-anim { animation: slideIn 0.3s ease-out forwards; }
+        .card-flying { animation: flyToCenter 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-between p-3">
 
     <!-- شاشة البداية -->
     <div id="unoStart" class="bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-md shadow-2xl text-center my-auto">
-        <h1 class="text-3xl font-extrabold text-rose-500 mb-2">🃏 أونو التفاعلية مع البوتات</h1>
-        <p class="text-xs text-slate-300 mb-6">تنافس مع الروبوتات بذكاء وأدوار حقيقية!</p>
+        <h1 class="text-3xl font-extrabold text-rose-500 mb-2">🃏 أونو الواقعية التفاعلية</h1>
+        <p class="text-xs text-slate-300 mb-6">انضم إلى الطاولة وتنافس مع اللاعبين بذكاء وأجواء حقيقية!</p>
 
         <input type="text" id="unoPlayerName" placeholder="اكتب اسمك للبدء..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-white text-center text-sm font-bold">
         
-        <button onclick="startUnoGame()" class="w-full bg-rose-600 hover:bg-rose-500 font-extrabold py-3.5 rounded-xl shadow-lg text-white text-base mb-3">بدء اللعب الآن 🚀</button>
+        <button onclick="startUnoGame()" class="w-full bg-rose-600 hover:bg-rose-500 font-extrabold py-3.5 rounded-xl shadow-lg text-white text-base mb-3">جلوس على الطاولة 🚀</button>
         <a href="index.html" class="block text-xs text-slate-400 underline mt-2">← العودة للرئيسية</a>
     </div>
 
-    <!-- شاشة الانتظار -->
+    <!-- شاشة البحث التلقائي (توحي بالانضمام لطاولة حقيقية) -->
     <div id="unoSearching" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-3xl w-full max-w-sm text-center my-auto">
         <div class="text-4xl mb-3 animate-spin">⏳</div>
-        <h3 class="text-base font-bold text-amber-300 mb-2">جاري تجهيز الطاولة واستدعاء البوتات...</h3>
+        <h3 class="text-base font-bold text-amber-300 mb-2">جاري البحث عن طاولة فارغة وانضمام اللاعبين...</h3>
     </div>
 
     <!-- شاشة اللعب النشطة -->
     <div id="unoGameScreen" class="hidden w-full max-w-5xl flex flex-col justify-between min-h-[92vh]">
         
         <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700 text-xs">
-            <span id="unoPlayerBadge" class="font-bold text-amber-400">اللاعب: -</span>
-            <span class="text-emerald-400 font-bold bg-slate-900 px-3 py-1 rounded-full animate-pulse" id="unoTurnIndicator">دور: أنت</span>
+            <div class="flex items-center gap-2">
+                <span id="unoPlayerBadge" class="font-bold text-amber-400">اللاعب: -</span>
+                <button onclick="toggleMusic()" id="musicBtn" class="bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-amber-300 text-[11px]">🎵 الموسيقى: معطلة</button>
+            </div>
+            <span class="text-emerald-400 font-bold bg-slate-900 px-3 py-1 rounded-full" id="unoTurnIndicator">دور: أنت</span>
             <button onclick="location.reload()" class="bg-rose-600 text-white px-3 py-1 rounded-lg font-bold">خروج 🚪</button>
         </div>
 
-        <!-- أعداد أوراق المنافسين (البوتات) -->
+        <!-- أعداد أوراق المنافسين (أسماء طبيعية كأشخاص حقيقيين) -->
         <div id="opponentsBar" class="flex justify-center gap-4 my-2 flex-wrap"></div>
 
         <!-- طاولة اللعب المركزية -->
@@ -97,7 +103,7 @@
                 <span class="text-[10px] mt-1">سحب ورقة</span>
             </div>
 
-            <div id="currentDiscardCard" class="uno-card-real text-white card-anim">
+            <div id="currentDiscardCard" class="uno-card-real text-white">
                 <div id="discardOval" class="uno-oval bg-white text-slate-900 text-2xl font-black">7</div>
             </div>
         </div>
@@ -105,7 +111,7 @@
         <!-- أوراق اللاعب اليدوية -->
         <div class="bg-slate-800/95 border border-slate-700 p-4 rounded-3xl flex flex-col items-center shadow-2xl">
             <div class="flex justify-between w-full mb-2 items-center px-2">
-                <span class="text-xs font-bold text-slate-300">أوراقك في اليد:</span>
+                <span class="text-xs font-bold text-slate-300">أوراقك في اليد (اضغط للرمي بحركة حقيقية):</span>
                 <button onclick="shoutUno()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-1.5 rounded-xl text-xs animate-bounce shadow-lg">📢 أونو! (UNO)</button>
             </div>
             <div id="playerHand" class="flex gap-2.5 overflow-x-auto w-full py-2 min-h-[145px] justify-center items-center"></div>
@@ -117,9 +123,81 @@
         let hand = [];
         let topCard = {};
         let players = [];
-        let currentTurnIndex = 0; // 0 هو أنت، والبقية بوتات
+        let currentTurnIndex = 0;
+        let musicPlaying = false;
+        let audioCtx = null;
+
         const colors = ['red', 'blue', 'green', 'yellow'];
         const colorHex = { red: '#D32F2F', blue: '#1976D2', green: '#388E3C', yellow: '#FBC02D' };
+
+        // نظام المؤثرات الصوتية الحقيقية (Web Audio API) دون الحاجة لملفات خارجية
+        function playSound(type) {
+            try {
+                if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if(type === 'play') {
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if(type === 'draw') {
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.12);
+                }
+            } catch(e) {}
+        }
+
+        // تشغيل وإيقاف الموسيقى الخلفية الهادئة
+        let bgInterval = null;
+        function toggleMusic() {
+            musicPlaying = !musicPlaying;
+            const btn = document.getElementById('musicBtn');
+            if(musicPlaying) {
+                btn.innerText = "🎵 الموسيقى: تعمل";
+                btn.className = "bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-lg text-white text-[11px]";
+                startBGM();
+            } else {
+                btn.innerText = "🎵 الموسيقى: معطلة";
+                btn.className = "bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-amber-300 text-[11px]";
+                stopBGM();
+            }
+        }
+
+        function startBGM() {
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const notes = [261.63, 329.63, 392.00, 523.25]; // نغمات هادئة
+            let i = 0;
+            bgInterval = setInterval(() => {
+                if(!musicPlaying) return;
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = notes[i % notes.length];
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.8);
+                    i++;
+                } catch(e) {}
+            }, 1200);
+        }
+
+        function stopBGM() {
+            if(bgInterval) clearInterval(bgInterval);
+        }
 
         function startUnoGame() {
             const name = document.getElementById('unoPlayerName').value.trim();
@@ -132,15 +210,15 @@
                 document.getElementById('unoSearching').classList.add('hidden');
                 document.getElementById('unoGameScreen').classList.remove('hidden');
                 
-                // إعداد اللاعبين (أنت + بوتين)
+                // أسماء حقيقية تماماً للمنافسين (بدون إيحاء بأنهم روبوتات)
                 players = [
                     { name: name, isBot: false, handCount: 7 },
-                    { name: 'Ryan (بوت)', isBot: true, handCount: 7 },
-                    { name: 'زيزو (بوت)', isBot: true, handCount: 7 }
+                    { name: 'سعد العتيبي', isBot: true, handCount: 7 },
+                    { name: 'فيصل الشمري', isBot: true, handCount: 7 }
                 ];
 
                 initGame();
-            }, 1200);
+            }, 1500);
         }
 
         function initGame() {
@@ -162,12 +240,11 @@
         }
 
         function updateUI() {
-            // 1. تحديث أعداد أوراق البوتات
             const opponentsBar = document.getElementById('opponentsBar');
             opponentsBar.innerHTML = '';
             
             players.forEach((p, idx) => {
-                if(idx !== 0) { // البوتات فقط
+                if(idx !== 0) {
                     let cardsHtml = '';
                     for(let i=0; i<Math.min(p.handCount, 4); i++) {
                         cardsHtml += `<div class="uno-card-back" style="margin-right: -25px;">UNO</div>`;
@@ -176,7 +253,7 @@
                     opponentsBar.innerHTML += `
                         <div class="bg-slate-900/90 border ${isCurrent ? 'border-amber-400 ring-2 ring-amber-400' : 'border-slate-700'} px-3 py-2 rounded-2xl flex items-center gap-3 shadow-md transition">
                             <div class="text-right">
-                                <div class="text-xs font-bold ${isCurrent ? 'text-amber-300 animate-pulse' : 'text-slate-300'}">${p.name} ${isCurrent ? '⏳' : ''}</div>
+                                <div class="text-xs font-bold ${isCurrent ? 'text-amber-300 animate-pulse' : 'text-slate-300'}">${p.name} ${isCurrent ? '✍️ يلعب الآن' : ''}</div>
                                 <div class="text-[10px] text-slate-400">${p.handCount} أوراق باليد</div>
                             </div>
                             <div class="flex items-center pr-4">${cardsHtml}</div>
@@ -185,14 +262,13 @@
                 }
             });
 
-            // 2. تحديث يدك
             const handDiv = document.getElementById('playerHand');
             handDiv.innerHTML = '';
 
             hand.forEach((card, index) => {
                 const bgCol = colorHex[card.color];
                 const cardEl = document.createElement('div');
-                cardEl.className = 'uno-card-real text-white card-anim';
+                cardEl.className = 'uno-card-real text-white';
                 cardEl.style.backgroundColor = bgCol;
                 cardEl.innerHTML = `
                     <div class="absolute top-1 left-2 text-[10px] font-mono">${card.value}</div>
@@ -203,7 +279,6 @@
                 handDiv.appendChild(cardEl);
             });
 
-            // 3. الكومة المركزية
             const discardBg = colorHex[topCard.color];
             const discardCard = document.getElementById('currentDiscardCard');
             discardCard.style.backgroundColor = discardBg;
@@ -217,37 +292,35 @@
             const indicator = document.getElementById('unoTurnIndicator');
 
             if(currentPlayer.isBot) {
-                indicator.innerText = `دور: ${currentPlayer.name} (يفكر...)`;
+                indicator.innerText = `دور: ${currentPlayer.name} (يفكر في الحركة...)`;
                 indicator.className = "text-amber-400 font-bold bg-slate-900 px-3 py-1 rounded-full animate-pulse";
                 
-                // البوت يفكر لمدة ثانية ونصف ثم يلعب تلقائياً
                 setTimeout(() => {
                     botPlayTurn(currentTurnIndex);
-                }, 1500);
+                }, 1800);
             } else {
-                indicator.innerText = `دورك الآن! (العب ورقة أو اسحب)`;
+                indicator.innerText = `دورك الآن! (اختر ورقة للرمي أو اسحب)`;
                 indicator.className = "text-emerald-400 font-bold bg-slate-900 px-3 py-1 rounded-full animate-bounce";
             }
         }
 
         function botPlayTurn(botIndex) {
             const bot = players[botIndex];
-            // البوت ينقص ورقة أو يسحب عشوائياً
             if(Math.random() > 0.3 && bot.handCount > 1) {
                 bot.handCount--;
-                // تغيير لون الطاولة أحياناً لتبدو واقعية
                 topCard.color = colors[Math.floor(Math.random() * colors.length)];
+                playSound('play');
             } else {
-                bot.handCount++; // سحب ورقة عند الحاجة
+                bot.handCount++;
+                playSound('draw');
             }
 
             if(bot.handCount === 0) {
-                alert(`🏁 انتهت الجولة! الفائز هو: ${bot.name}`);
+                alert(`🏁 انتهت الجولة! فاز اللاعب: ${bot.name}`);
                 location.reload();
                 return;
             }
 
-            // الانتقال للوراء أو للاعب التالي
             currentTurnIndex = (currentTurnIndex + 1) % players.length;
             updateUI();
             checkTurn();
@@ -255,23 +328,28 @@
 
         function playCard(index) {
             if(currentTurnIndex !== 0) {
-                return alert('⏳ ليس دورك الآن! انتظر دورك.');
+                return alert('⏳ ليس دورك الآن! انتظر دور اللاعب الآخر.');
             }
 
             const card = hand[index];
             if(card.color === topCard.color || card.value === topCard.value) {
+                playSound('play');
+                
+                // تطبيق تأثير حركة طيران الورقة إلى الطاولة
+                const discardCard = document.getElementById('currentDiscardCard');
+                discardCard.classList.add('card-flying');
+                setTimeout(() => discardCard.classList.remove('card-flying'), 350);
+
                 topCard = card;
                 hand.splice(index, 1);
-
                 players[0].handCount = hand.length;
 
                 if(hand.length === 0) {
-                    alert('🎉 مبروك! لقد تخلصت من كل أوراقك وفزت بالجولة بجدارة!');
+                    alert('🎉 مبروك! لقد تخلصت من كل أوراقك وفزت بالطاولة!');
                     location.reload();
                     return;
                 }
 
-                // انتقال الدور للبوت التالي
                 currentTurnIndex = (currentTurnIndex + 1) % players.length;
                 updateUI();
                 checkTurn();
@@ -285,10 +363,10 @@
                 return alert('⏳ ليس دورك الآن!');
             }
 
+            playSound('draw');
             hand.push(randomCard());
             players[0].handCount = hand.length;
             
-            // انتهاء دورك بعد السحب وانتقال الدور للبوت
             currentTurnIndex = (currentTurnIndex + 1) % players.length;
             updateUI();
             checkTurn();
@@ -296,9 +374,9 @@
 
         function shoutUno() {
             if(hand.length === 1) {
-                alert('📢 أونو! (UNO) - أعلنت الفوز الوشيك!');
+                alert('📢 أونو! (UNO) - أعلنت الفوز الوشيك بنجاح!');
             } else {
-                alert('⚠️ يمكنك قول أونو فقط عندما يتبقى لديك ورقة واحدة!');
+                alert('⚠️ متاح فقط عندما تتبقى لديك ورقة واحدة!');
             }
         }
     </script>

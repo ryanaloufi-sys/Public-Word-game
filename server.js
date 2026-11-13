@@ -14,11 +14,13 @@ const arabicLetters = ['أ', 'ب', 'ت', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش
 const categories = ['إنسان', 'حيوان', 'نبات', 'جماد', 'بلاد'];
 
 let matchmakingQueue = [];
+let unoQueue = [];
 const rooms = {};
 
 io.on('connection', (socket) => {
     console.log(`🔌 متصل جديد: ${socket.id}`);
 
+    // إدارة تسجيل الحسابات
     socket.on('register_user', ({ identifier, password, username }) => {
         if (!identifier || !password || !username) return socket.emit('auth_error', 'يرجى إكمال جميع الحقول');
         if (usersMemoryDB.find(u => u.identifier === identifier)) {
@@ -42,7 +44,9 @@ io.on('connection', (socket) => {
         socket.emit('auth_success', { username: socket.username, cash: 15, score: 100 });
     });
 
-    // 1. البحث السريع (بحد أقصى 5 لاعبين والعداد التنازلي)
+    // ==========================================
+    // 1. نظام إنسان حيوان نبات (جماعي + بوتات + غرف)
+    // ==========================================
     socket.on('start_matchmaking', () => {
         matchmakingQueue.push(socket);
         broadcastQueueCount();
@@ -71,7 +75,7 @@ io.on('connection', (socket) => {
         rooms[roomCode] = {
             code: roomCode,
             players: [
-                { socketId: socket.id, username: socket.username, score: 0, answers: {}, votes: {} },
+                { socketId: socket.id, username: socket.username || 'لاعب', score: 0, answers: {}, votes: {} },
                 { socketId: 'b1', username: 'Ryan', score: 15, answers: { 'إنسان': 'أحمد', 'حيوان': 'أسد', 'نبات': 'أناناس', 'جماد': 'إبريق', 'بلاد': 'أردن' } },
                 { socketId: 'b2', username: 'زيزو', score: 17, answers: { 'إنسان': 'أمين', 'حيوان': 'أرنب', 'نبات': 'أرز', 'جماد': 'إبرة', 'بلاد': 'إسبانيا' } }
             ],
@@ -85,11 +89,10 @@ io.on('connection', (socket) => {
     }
 
     function setupRoomForGroup(group) {
-        group.forEach(p => clearTimeout(p.matchTimer));
         const roomCode = 'GRP_' + Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
             code: roomCode,
-            players: group.map(p => ({ socketId: p.id, username: p.username, score: 0, answers: {}, votes: {} })),
+            players: group.map(p => ({ socketId: p.id, username: p.username || 'لاعب', score: 0, answers: {}, votes: {} })),
             currentRound: 1,
             totalRounds: 3
         };
@@ -98,13 +101,13 @@ io.on('connection', (socket) => {
         startRound(roomCode);
     }
 
-    // 2. إنشاء غرفة خاصة (حتى 7 لاعبين)
+    // الغرف الخاصة لإنسان حيوان نبات (حتى 7 لاعبين)
     socket.on('create_private_room', () => {
         const roomCode = 'PRIV_' + Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomCode] = {
             code: roomCode,
-            host: socket.username,
-            players: [{ socketId: socket.id, username: socket.username, score: 0, answers: {}, votes: {} }],
+            host: socket.username || 'المضيف',
+            players: [{ socketId: socket.id, username: socket.username || 'لاعب', score: 0, answers: {}, votes: {} }],
             maxPlayers: 7,
             currentRound: 1,
             totalRounds: 3
@@ -114,22 +117,18 @@ io.on('connection', (socket) => {
         socket.emit('private_room_created', roomCode);
     });
 
-    // 3. الانضمام إلى غرفة خاصة عبر الكود
     socket.on('join_private_room', (code) => {
-        const cleanCode = code.trim().toUpperCase();
+        const cleanCode = (code || '').trim().toUpperCase();
         const room = rooms[cleanCode];
         if (!room) return socket.emit('error_msg', '❌ الغرفة غير موجودة تأكد من الكود');
-        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '❌ الغرفة ممتلئة (الحد الأقصى 7)');
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '❌ الغرفة ممتلئة!');
         
-        room.players.push({ socketId: socket.id, username: socket.username, score: 0, answers: {}, votes: {} });
+        room.players.push({ socketId: socket.id, username: socket.username || 'لاعب', score: 0, answers: {}, votes: {} });
         socket.join(room.code);
         socket.roomCode = room.code;
-
-        // تحديث جميع اللاعبين في الغرفة باللاعبين الجدد
         io.to(room.code).emit('update_room_lobby', room.players);
     });
 
-    // بدء الغرفة الخاصة يدوياً من قبل المضيف
     socket.on('start_private_game', (code) => {
         const room = rooms[code];
         if(room) {
@@ -138,7 +137,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // تسليم الإجابات ومرحلة التصحيح الجماعي
     socket.on('submit_answers', (answers) => {
         const room = rooms[socket.roomCode];
         if (!room) return;
@@ -188,8 +186,36 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ==========================================
+    // 2. نظام لعبة أونو (UNO) السريع (بدون تعليق)
+    // ==========================================
+    socket.on('uno_matchmaking', () => {
+        unoQueue.push(socket);
+
+        // مؤقت سريع بـ 3 ثوانٍ لمنع التعليق نهائياً والدخول مع روبوتات
+        socket.unoTimer = setTimeout(() => {
+            const index = unoQueue.indexOf(socket);
+            if(index !== -1) {
+                unoQueue.splice(index, 1);
+                socket.emit('uno_start_game', { 
+                    isBotGame: true, 
+                    players: [socket.username || 'لاعب', 'Ryan', 'زيزو'] 
+                });
+            }
+        }, 3000);
+
+        if(unoQueue.length >= 3) {
+            const group = unoQueue.splice(0, 3);
+            group.forEach(p => clearTimeout(p.unoTimer));
+            const playerNames = group.map(p => p.username || 'لاعب');
+            group.forEach(p => p.emit('uno_start_game', { isBotGame: false, players: playerNames }));
+        }
+    });
+
+    // تنظيف عند قطع الاتصال
     socket.on('disconnect', () => {
         matchmakingQueue = matchmakingQueue.filter(p => p.id !== socket.id);
+        unoQueue = unoQueue.filter(p => p.id !== socket.id);
         broadcastQueueCount();
     });
 });

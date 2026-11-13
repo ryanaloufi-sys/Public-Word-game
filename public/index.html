@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة إنسان حيوان نبات</title>
+    <title>منصة الألعاب الجماعية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -13,16 +13,15 @@
 </head>
 <body class="w-full h-full p-2">
 
-    <!-- 1. شاشة البداية والاختيار بين تسجيل الدخول والتسجيل -->
+    <!-- شاشة الاختيار بين تسجيل الدخول والتسجيل -->
     <div id="authChoiceScreen" class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-        <h2 class="text-2xl font-bold mb-3 text-amber-400">🎮 إنسان حيوان نبات</h2>
+        <h2 class="text-2xl font-bold mb-3 text-amber-400">🎮 منصة الألعاب الجماعية</h2>
         <p class="text-xs text-slate-400 mb-6">اختر طريقة الدخول:</p>
         <button onclick="showScreen('loginScreen')" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg mb-3">تسجيل الدخول 🔑</button>
         <button onclick="showScreen('registerScreen')" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-xl text-white shadow-lg mb-3">إنشاء حساب جديد 📝</button>
         <button onclick="socket.emit('guest_login')" class="w-full bg-slate-700 hover:bg-slate-600 font-bold py-2.5 rounded-xl text-amber-300 text-sm border border-slate-600">👤 اللعب كضيف سريع</button>
     </div>
 
-    <!-- شاشة تسجيل الدخول المنفصلة -->
     <div id="loginScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
         <h2 class="text-xl font-bold mb-3 text-amber-400">🔑 تسجيل الدخول</h2>
         <input type="text" id="loginId" placeholder="البريد أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
@@ -31,7 +30,6 @@
         <button onclick="showScreen('authChoiceScreen')" class="text-xs text-slate-400 underline mt-2">← رجوع</button>
     </div>
 
-    <!-- شاشة إنشاء حساب جديد المنفصلة -->
     <div id="registerScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl text-center">
         <h2 class="text-xl font-bold mb-3 text-amber-400">📝 حساب جديد</h2>
         <input type="text" id="regId" placeholder="البريد أو رقم الجوال" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-3 text-white text-sm">
@@ -41,58 +39,47 @@
         <button onclick="showScreen('authChoiceScreen')" class="text-xs text-slate-400 underline mt-2">← رجوع</button>
     </div>
 
-    <!-- 2. الشاشة الرئيسية (Lobby) بمحيط الشاشة الكامل -->
+    <!-- صفحة اللوبي الرئيسية (مع أزرار اختيار الألعاب) -->
     <div id="lobbyScreen" class="hidden bg-[#0d1b2a] border border-slate-800 p-4 rounded-3xl w-full max-w-lg min-h-[90vh] shadow-2xl relative flex flex-col items-center justify-between">
         
         <div class="w-full flex justify-between items-center bg-slate-900/80 p-2.5 rounded-2xl text-xs border border-slate-700">
             <div class="flex items-center gap-1 font-bold text-rose-400">🎟️ <span>118</span></div>
             <div class="flex items-center gap-1 font-bold text-amber-400">🪙 <span id="cashCount">15</span></div>
-            <div class="flex items-center gap-1 font-bold text-amber-200">👑 <span>0</span></div>
             <div class="flex items-center gap-1 font-bold text-emerald-400">❤️ <span>5/5</span></div>
         </div>
 
-        <div class="w-full bg-slate-800/80 p-3 rounded-2xl flex justify-between items-center border border-slate-700">
-            <span class="text-xs text-slate-300">المركز الأول: <b class="text-amber-400">saeed2222</b></span>
-            <span class="text-xs bg-slate-900 px-2 py-1 rounded text-amber-300 font-mono">2414 نقطة</span>
-        </div>
-
-        <!-- زر "لعب" الدائري الكبير وزر "خاص" تحته -->
-        <div class="my-auto flex flex-col items-center">
-            <button onclick="startMatch()" class="pinball-circle w-44 h-44 rounded-full shadow-2xl flex flex-col items-center justify-center border-4 border-amber-300 transform hover:scale-105 transition">
-                <span class="text-4xl font-extrabold text-slate-900">لعب</span>
-            </button>
+        <!-- 🎮 قائمة اختيار الألعاب في نفس صفحة البداية -->
+        <div class="w-full space-y-3 my-auto">
+            <h3 class="text-center font-bold text-amber-400 text-sm mb-2">اختر اللعبة للبدء:</h3>
             
-            <button onclick="socket.emit('create_private_room')" class="mt-6 bg-rose-600 hover:bg-rose-500 font-bold px-10 py-3 rounded-xl shadow-lg text-white border border-rose-500 text-sm">
-                🔒 خاص (حتى 7 لاعبين)
-            </button>
+            <a href="#" onclick="startMatch()" class="block bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold p-4 rounded-2xl text-center shadow-lg transition transform hover:scale-105">
+                🌱 لعبة إنسان حيوان نبات الجماعية
+            </a>
+            
+            <a href="lokhma.html" class="block bg-purple-600 hover:bg-purple-500 text-white font-extrabold p-4 rounded-2xl text-center shadow-lg transition transform hover:scale-105">
+                🧠 لعبة لخمّة السرعة والتحدي
+            </a>
+
+            <a href="uno.html" class="block bg-rose-600 hover:bg-rose-500 text-white font-extrabold p-4 rounded-2xl text-center shadow-lg transition transform hover:scale-105">
+                🃏 لعبة أونو (UNO) الرسمية
+            </a>
         </div>
 
-        <!-- قسم التعليمات وقواعد اللعب قبل الدخول -->
         <div class="w-full bg-slate-900/90 p-3 rounded-2xl border border-slate-700 text-right text-xs text-slate-300 space-y-1">
-            <div class="font-bold text-amber-400 mb-1">📖 تعليمات وقواعد اللعب:</div>
-            <div>• اكتب الكلمات الصحيحة التي تبدأ بحرف الجولة لكل تصنيف.</div>
-            <div>• بعد انتهاء الوقت، قم بتصحيح إجابات منافسيك (صح ✅ أو خطأ ❌).</div>
-            <div>• صحين = 10 نقاط | صح وخطأ = 5 نقاط | خطأين = 0 نقاط.</div>
+            <div class="font-bold text-amber-400 mb-1">📖 تعليمات عامة:</div>
+            <div>• اختر لعبتك المفضلة واستمتع بالتحدي مع الأصدقاء أو اللاعبين.</div>
         </div>
     </div>
 
-    <!-- شاشة البحث السريع والعداد (X / 5) -->
+    <!-- شاشة البحث السريع لإنسان حيوان نبات -->
     <div id="searchingScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center">
         <div class="text-4xl mb-3 animate-spin">⏳</div>
-        <h3 class="text-base font-bold text-amber-300 mb-2">جاري تجميع اللاعبين...</h3>
+        <h3 class="text-base font-bold text-amber-300 mb-2">جاري تجميع اللاعبين (حد أقصى 5)...</h3>
         <div id="queueCounter" class="text-3xl font-extrabold text-emerald-400 tracking-widest my-3">1 / 5</div>
         <button onclick="location.reload()" class="bg-rose-600 text-white py-2 px-6 rounded-xl text-xs font-bold">إلغاء</button>
     </div>
 
-    <!-- شاشة الغرفة الخاصة -->
-    <div id="privateRoomScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
-        <h3 class="font-bold text-amber-400 mb-2">🔒 الغرفة الخاصة (حتى 7 لاعبين)</h3>
-        <p class="text-xs text-slate-300 mb-2">شارك هذا الكود مع أصدقائك:</p>
-        <div class="bg-slate-900 p-3 rounded-xl font-mono text-xl text-emerald-400 font-bold mb-4" id="roomCodeDisplay">-----</div>
-        <button onclick="location.reload()" class="w-full bg-rose-600 text-white py-2.5 rounded-xl text-sm font-bold">مغادرة الغرفة</button>
-    </div>
-
-    <!-- 3. شاشة اللعب النشطة (مع زر خروج وعداد تنازلي 60 ثانية) -->
+    <!-- شاشة اللعب النشطة لإنسان حيوان نبات -->
     <div id="gameScreen" class="hidden bg-[#0d1b2a] border border-slate-700 p-4 rounded-2xl w-full max-w-4xl shadow-2xl relative">
         <button onclick="location.reload()" class="absolute top-4 left-4 bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold">خروج 🚪</button>
 
@@ -106,7 +93,7 @@
         <button onclick="submitAnswers()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-white shadow-lg text-base">تسليم الإجابات 🚀</button>
     </div>
 
-    <!-- 4. شاشة التصحيح الجماعي المتبادل (مطابقة تماماً للصور المرفقة 18 و 19) -->
+    <!-- شاشة التصحيح الجماعي المتبادل -->
     <div id="reviewScreen" class="hidden bg-slate-800 border border-slate-700 p-4 rounded-2xl w-full max-w-4xl text-center shadow-2xl">
         <h3 class="font-bold text-amber-400 mb-1 text-sm">📋 صحح إجابات منافسيك (اضغط صح أو خطأ)</h3>
         <p class="text-[11px] text-slate-400 mb-3">صحين = 10 نقاط | صح وخطأ = 5 نقاط | خطأين = 0</p>
@@ -130,7 +117,7 @@
         <button onclick="finishReview()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-xl text-white shadow-lg text-sm">اعتماد النتيجة والانتقال للجولة التالية ⏭️</button>
     </div>
 
-    <!-- شاشة النتائج النهائية -->
+    <!-- النتائج النهائية -->
     <div id="finalScreen" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md text-center">
         <h2 class="text-xl font-bold text-amber-400 mb-3">🏆 لوحة الفائزين النهائية</h2>
         <ol id="podiumList" class="space-y-2 text-right bg-slate-900 p-4 rounded-xl text-xs mb-4"></ol>
@@ -139,12 +126,11 @@
 
     <script>
         const socket = io();
-        let currentTargetLetter = '';
         let categoriesList = [];
         let roundTimerInterval;
 
         function showScreen(screenId) {
-            ['authChoiceScreen', 'loginScreen', 'registerScreen', 'lobbyScreen', 'searchingScreen', 'privateRoomScreen', 'gameScreen', 'reviewScreen', 'finalScreen'].forEach(id => {
+            ['authChoiceScreen', 'loginScreen', 'registerScreen', 'lobbyScreen', 'searchingScreen', 'gameScreen', 'reviewScreen', 'finalScreen'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
             document.getElementById(screenId).classList.remove('hidden');
@@ -178,11 +164,6 @@
             document.getElementById('queueCounter').innerText = `${data.count} / ${data.max}`;
         });
 
-        socket.on('private_room_created', (code) => {
-            showScreen('privateRoomScreen');
-            document.getElementById('roomCodeDisplay').innerText = code;
-        });
-
         socket.on('match_started', () => {
             showScreen('gameScreen');
         });
@@ -191,7 +172,6 @@
             showScreen('gameScreen');
             document.getElementById('roundBadge').innerText = `الجولة ${data.round} من ${data.total}`;
             document.getElementById('letterBadge').innerText = `الحرف: ${data.letter}`;
-            currentTargetLetter = data.letter;
             categoriesList = data.categories;
 
             const box = document.getElementById('categoriesInputs');
@@ -227,7 +207,6 @@
             socket.emit('submit_answers', answers);
         }
 
-        // شاشة التصحيح المتبادل (مطابقة للصور 18 و 19)
         socket.on('open_review_phase', (players) => {
             showScreen('reviewScreen');
             const tbody = document.getElementById('reviewTableBody');
@@ -258,13 +237,12 @@
 
         function vote(targetSocketId, category, isApproved, btn) {
             socket.emit('vote_answer', { targetSocketId, category, isApproved });
-            btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('ring-2', 'ring-white', 'opacity-100'));
+            btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('ring-2', 'ring-white'));
             btn.classList.add('ring-2', 'ring-white');
         }
 
         function finishReview() {
             socket.emit('finish_review_phase');
-            alert('تم اعتماد التصحيح الجماعي بنجاح!');
         }
 
         socket.on('game_over', (players) => {
